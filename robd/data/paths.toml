@@ -1,0 +1,8 @@
+[eth3d]
+    root = '/tmp/eth3d/'
+
+[flyingthings3d]
+    root = '/tmp/flyingthings3d/'
+
+[blendedmvs]
+    root = '/tmp/blendedmvs/'
