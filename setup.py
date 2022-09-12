@@ -8,16 +8,16 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-exec(open('robd/version.py').read())
+exec(open('rmvd/version.py').read())
 setup(
-    name='robd',
+    name='rmvd',
     version=__version__,
-    description='Robust Depth Framework',
+    description='Robust Multi-view Depth Framework',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/robustmvd/robustmvd',
-    author='Anonymous',
-    author_email='anon@anon.com',
+    author='Philipp Schröppel',
+    author_email='schroepp@cs.uni-freiburg.de',
     classifiers=[
         # How mature is this project? Common values are
         #   3 - Alpha
@@ -39,6 +39,6 @@ setup(
     keywords='pytorch models datatasets depth estimation multi-view benchmark',
     packages=find_packages(exclude=['sample_data', 'tests', 'weights']),
     include_package_data=True,
-    install_requires=['torch >= 1.9.0', 'numpy', 'pillow', 'matplotlib', 'pandas', 'pytoml', 'tqdm', 'opencv-python'],
+    install_requires=['torch >= 1.9.0', 'numpy', 'pillow', 'matplotlib', 'pandas', 'pytoml', 'tqdm', 'opencv-python', 'scikit-image'],
     python_requires='>=3.8',
 )

@@ -16,3 +16,4 @@ __pycache__
 db.sqlite3
 *.h5
 .pytest_cache
+sample_data

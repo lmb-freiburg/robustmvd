@@ -8,7 +8,7 @@ from .dataset import Dataset, Sample
 from .registry import register_dataset, register_default_dataset
 
 
-def readPFM(file):  # TODO: move to robd utils
+def readPFM(file):  # TODO: move to rmvd utils
     file = open(file, 'rb')
 
     header = file.readline().rstrip()

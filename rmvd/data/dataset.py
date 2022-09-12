@@ -8,7 +8,7 @@ import torch
 import numpy as np
 import pytoml
 
-import robd.utils as utils
+import rmvd.utils as utils
 from .transforms import Resize
 
 
@@ -104,7 +104,7 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
             self.resize(sample_dict)
 
         if self.to_torch:
-            sample_dict = utils.to_torch(sample_dict)
+            sample_dict = utils.torch_collate([sample_dict])
 
         return sample_dict
 

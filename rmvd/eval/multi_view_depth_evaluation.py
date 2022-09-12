@@ -10,7 +10,7 @@ import skimage.transform
 import numpy as np
 import pandas as pd
 
-from robd.utils import numpy_collate
+from rmvd.utils import numpy_collate
 from .metrics import m_rel_ae, pointwise_rel_ae, thresh_inliers, sparsification
 
 

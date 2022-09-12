@@ -4,13 +4,14 @@ Based on and partially copied from the model registry from the
 timm package ( https://github.com/rwightman/pytorch-image-models ).
 """
 from copy import deepcopy
+import collections
 
 import torch
 from torch.hub import load_state_dict_from_url
 
 from typing import Callable, Optional, Dict
 
-from robd.utils import numpy_collate
+from rmvd.utils import numpy_collate
 
 
 _DOWNLOAD_PROGRESS = False
@@ -32,7 +33,7 @@ def remove_batch_dim(batch):
         if batch_type.__name__ == 'ndarray' or batch_type.__name__ == 'memmap':
             return batch[0]
 
-    elif isinstance(batch_type, collections.abc.Mapping):
+    elif isinstance(batch, collections.abc.Mapping):
         try:
             return batch_type({key: remove_batch_dim(batch[key]) for key in batch})
         except TypeError:
@@ -56,7 +57,7 @@ def remove_batch_dim(batch):
 
 def add_run_function(model):
     @torch.no_grad()
-    def run(images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
+    def run(images, keyview_idx, poses=None, intrinsics=None, depth_range=None, **_):
         no_batch_dim = (images[0].ndim == 3)
         if no_batch_dim:
             images, keyview_idx, poses, intrinsics, depth_range = \

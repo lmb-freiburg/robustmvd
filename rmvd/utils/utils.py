@@ -72,12 +72,48 @@ def to_cuda(data, device=None):
         return data
 
 
-def to_torch(data):  # TODO: this only works for non-batched input data; rename to torch_collate
-    return torch.utils.data._utils.collate.default_collate([data])
+def torch_collate(batch):
+    if batch is None:
+        return None
+
+    return torch.utils.data._utils.collate.default_collate(batch)
 
 
-def to_numpy(data):
-    pass # TODO
+def to_torch(data, device=None):
+    # adapted from torch.utils.data._utils.collate.default_convert
+    np_str_obj_array_pattern = re.compile(r'[SaUO]')
+
+    if data is None:
+        return None
+
+    elem_type = type(data)
+    if isinstance(data, torch.Tensor):
+        return data.to(device)
+    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+            and elem_type.__name__ != 'string_':
+        # array of string classes and object
+        if elem_type.__name__ == 'ndarray' \
+                and np_str_obj_array_pattern.search(data.dtype.str) is not None:
+            return data
+        return torch.as_tensor(data, device=device)
+    elif isinstance(data, collections.abc.Mapping):
+        try:
+            return elem_type({key: to_torch(data[key], device=device) for key in data})
+        except TypeError:
+            # The mapping type may not support `__init__(iterable)`...
+            return {key: to_torch(data[key], device=device) for key in data}
+    elif isinstance(data, tuple) and hasattr(data, '_fields'):  # namedtuple
+        return elem_type(*(to_torch(d, device=device) for d in data))
+    elif isinstance(data, tuple):
+        return [to_torch(d, device=device) for d in data]  # Backwards compatibility.
+    elif isinstance(data, collections.abc.Sequence) and not isinstance(data, string_classes):
+        try:
+            return elem_type([to_torch(d, device=device) for d in data])
+        except TypeError:
+            # The sequence type may not support `__init__(iterable)` (e.g., `range`).
+            return [to_torch(d, device=device) for d in data]
+    else:
+        return data
 
 
 def numpy_collate(batch):
@@ -101,7 +137,7 @@ def numpy_collate(batch):
         if elem_type.__name__ == 'ndarray' or elem_type.__name__ == 'memmap':
             return np.stack(batch, 0)
         elif elem.shape == ():  # scalars
-            return batch  # do nothing
+            return np.array(batch)
 
     elif isinstance(elem, float):
         return np.array(batch)
@@ -142,6 +178,36 @@ def numpy_collate(batch):
     raise TypeError(err_msg_format.format(elem_type))
 
 
+def to_numpy(data):
+    if data is None:
+        return None
+
+    elem_type = type(data)
+    if isinstance(data, torch.Tensor):
+        return data.detach().cpu().numpy()
+    elif elem_type.__module__ == 'numpy' and elem_type.__name__ != 'str_' \
+            and elem_type.__name__ != 'string_':
+        return data
+    elif isinstance(data, collections.abc.Mapping):
+        try:
+            return elem_type({key: to_numpy(data[key]) for key in data})
+        except TypeError:
+            # The mapping type may not support `__init__(iterable)`.
+            return {key: to_numpy(data[key]) for key in data}
+    elif isinstance(data, tuple) and hasattr(data, '_fields'):  # namedtuple
+        return elem_type(*(to_numpy(d) for d in data))
+    elif isinstance(data, tuple):
+        return [to_numpy(d) for d in data]  # Backwards compatibility.
+    elif isinstance(data, collections.abc.Sequence) and not isinstance(data, string_classes):
+        try:
+            return elem_type([to_numpy(d) for d in data])
+        except TypeError:
+            # The sequence type may not support `__init__(iterable)` (e.g., `range`).
+            return [to_numpy(d) for d in data]
+    else:
+        return data
+
+
 def get_torch_model_device(model):
     # make sure that all parameters are on the same device:
     it = iter(model.parameters())
@@ -159,3 +225,48 @@ def check_torch_model_cuda(model):
     if not all((elem.is_cuda == is_cuda) for elem in it):
         raise RuntimeError('All model parameters need to be on the same device')
     return is_cuda
+
+
+def select_by_index(l, idx):
+    """Select an element from a list by an index. Supports data batches with different indices.
+
+    Args:
+        l (list): List with potentially batched data items.
+        idx: idx can be an integer in case of non-batched data or in case samples in the batch have the same index.
+            Alternatively, idx can be an iterable that contains indices for each sample in the batch separately.
+    """
+    if isinstance(idx, int):
+        ret = l[idx]
+    else:
+        indices = idx
+        ret = []
+        for batch_idx, idx in enumerate(indices):
+            ret.append(l[idx][batch_idx])
+
+        ret = torch.stack(ret, 0)
+        # TODO: l might be a list of other data than just torch.Tensor or np arrays
+
+    return ret
+
+
+def exclude_index(l, exclude_idx):
+    """Selects all element from a list, excluding a specific index. Supports data batches with different indices.
+
+    Args:
+        l (list): List with potentially batched data items.
+        idx: idx can be an integer in case of non-batched data or in case samples in the batch have the same index.
+            Alternatively, idx can be an iterable that contains indices for each sample in the batch separately.
+    """
+    if isinstance(exclude_idx, int):
+        ret = [ele for idx, ele in enumerate(l) if idx != exclude_idx]
+    else:
+        exclude_indices = exclude_idx
+        ret = []
+        for batch_idx, exclude_idx in enumerate(exclude_indices):
+            ret.append([ele[batch_idx] for idx, ele in enumerate(l) if idx != exclude_idx])
+
+        transposed = list(zip(*ret))
+        ret = [torch.stack(ele, 0) for ele in transposed]
+        # TODO: l might be a list of other data than just torch.Tensor or np arrays
+
+    return ret

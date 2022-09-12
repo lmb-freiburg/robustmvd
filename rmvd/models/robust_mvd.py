@@ -10,7 +10,7 @@ from .blocks.learned_fusion import LearnedFusion
 from .blocks.dispnet_costvolume_encoder import DispnetCostvolumeEncoder
 from .blocks.dispnet_decoder import DispnetDecoder
 
-from robd.utils import get_torch_model_device
+from rmvd.utils import get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
 
 
 class RobustMVD(nn.Module):
@@ -43,12 +43,13 @@ class RobustMVD(nn.Module):
 
     def forward(self, images, poses, intrinsics, keyview_idx, **_):
 
-        keyview_idx = int(keyview_idx)  # TODO: make this batch compatible
-        image_key = images[keyview_idx]  # TODO: handle this for batch size > 1
-        images_source = [image for idx, image in enumerate(images) if idx != keyview_idx]
-        intrinsics_key = intrinsics[keyview_idx]
-        intrinsics_source = [intrinsic for idx, intrinsic in enumerate(intrinsics) if idx != keyview_idx]
-        source_to_key_transforms = [pose for idx, pose in enumerate(poses) if idx != keyview_idx]
+        image_key = select_by_index(images, keyview_idx)
+        images_source = exclude_index(images, keyview_idx)
+
+        intrinsics_key = select_by_index(intrinsics, keyview_idx)
+        intrinsics_source = exclude_index(intrinsics, keyview_idx)
+
+        source_to_key_transforms = exclude_index(poses, keyview_idx)
 
         all_enc_key, enc_key = self.encoder(image_key)
         enc_sources = [self.encoder(image_source)[1] for image_source in images_source]
@@ -76,18 +77,10 @@ class RobustMVD(nn.Module):
     def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
         device = get_torch_model_device(self)
 
-        images = [image/255.0 - 0.4 for image in images]
-        images = [torch.from_numpy(image).to(device) for image in images]
-        keyview_idx = torch.from_numpy(keyview_idx).to(device)
+        images = [image / 255.0 - 0.4 for image in images]
 
-        if poses is not None:
-            poses = [torch.from_numpy(pose).to(device) for pose in poses]
-
-        if intrinsics is not None:
-            intrinsics = [torch.from_numpy(intrinsic).to(device) for intrinsic in intrinsics]
-
-        if depth_range is not None:
-            depth_range = [torch.Tensor(depth_range[0]).to(device), torch.Tensor(depth_range[1]).to(device)]
+        images, keyview_idx, poses, intrinsics, depth_range = \
+            to_torch((images, keyview_idx, poses, intrinsics, depth_range), device=device)
 
         sample = {
             'images': images,
@@ -99,19 +92,8 @@ class RobustMVD(nn.Module):
         return sample
 
     def output_adapter(self, model_output):
-        pred_in, aux_in = model_output
-        pred_out, aux_out = {}, {}
-
-        for k, v in pred_in.items():
-            pred_out[k] = v.detach().cpu().numpy()
-
-        for k, v in aux_in.items():  # TODO: move this to a to_numpy function
-            if isinstance(v, list):
-                aux_out[k] = [ele.detach().cpu().numpy() for ele in v]
-            else:
-                aux_out[k] = v.detach().cpu().numpy()
-
-        return pred_out, aux_out
+        pred, aux = model_output
+        return to_numpy(pred), to_numpy(aux)
 
 
 @register_model

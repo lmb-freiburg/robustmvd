@@ -135,7 +135,7 @@ details on using datasets within dataloaders, see below.
 ### Creating a dataset
 To create a dataset, use the `create_dataset` function:
 ```python
-from robd import create_dataset
+from rmvd import create_dataset
 dataset = create_dataset(dataset_name=dataset_name, dataset_type=dataset_type)  # optional: split, e.g. split='train'
 
 # for example:
@@ -172,7 +172,7 @@ A dataset can be created with the parameter `input_size=(height, width)`. The in
 Datasets are of type `torch.utils.data.Dataset` and usage instructions can be found in the pytorch documentation.
 The basic usage is:
 ```python
-from robd import create_dataset
+from rmvd import create_dataset
 dataset = create_dataset("eth3d.mvd", input_size=(384, 576))
 print(f"The dataset contains {len(dataset)} samples.")  # get number of samples in a dataset via len()
 sample = dataset[0]  # get sample from dataset; the sample has no batch dimension
@@ -180,19 +180,19 @@ sample = dataset[0]  # get sample from dataset; the sample has no batch dimensio
 
 #### Torch dataloaders
 It is possible to wrap a dataloader (`torch.utils.data.Dataloader`) around a dataset, as described in the pytorch 
-documentation. The robd datasets contain a convenience method for this, which can be used as follows:
+documentation. The rmvd datasets contain a convenience method for this, which can be used as follows:
 ```python
-from robd import create_dataset
+from rmvd import create_dataset
 dataset = create_dataset("eth3d.mvd", input_size=(384, 576))
 dataloader = dataset.get_loader(batch_size=4, shuffle=False, num_workers=2)
 ```
 
 #### Numpy dataloaders
-The robd datasets contain a convenience method to create dataloaders that load batched data in `numpy` format instead
+The rmvd datasets contain a convenience method to create dataloaders that load batched data in `numpy` format instead
 of `torch` format:
 ```python
-from robd import create_dataset
-from robd.utils import numpy_collate
+from rmvd import create_dataset
+from rmvd.utils import numpy_collate
 dataset = create_dataset("eth3d.mvd", input_size=(384, 576))
 dataloader = dataset.get_loader(batch_size=4, shuffle=False, num_workers=2, collate_fn=numpy_collate)
 ```

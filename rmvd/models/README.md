@@ -1,6 +1,6 @@
 # Models
 
-robd contains implementations of depth estimation models. The usage of the models is described in the following.
+rmvd contains implementations of depth estimation models. The usage of the models is described in the following.
 
 ## Usage
 
@@ -8,7 +8,7 @@ robd contains implementations of depth estimation models. The usage of the model
 
 To initialize a model, use the `create_model` function:
 ```python
-from robd import create_model
+from rmvd import create_model
 model = create_model(model_name, pretrained=True, weights=None, train=False, num_gpus=1)  # optional: model-specific parameters
 ```
 
@@ -16,7 +16,7 @@ model = create_model(model_name, pretrained=True, weights=None, train=False, num
 Some models support multiple variants/configurations. They are represented by different model names. 
 For all list of all models including their configurations, use the `list_models` function:
 ```python
-from robd import list_models
+from rmvd import list_models
 print(list_models())
 ```
 

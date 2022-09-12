@@ -2,27 +2,15 @@ import argparse
 import os
 import os.path as osp
 import math
+import sys
 
 import torch
 import numpy as np
 from PIL import Image
+from skimage.transform import resize
 
-from robust_mvd_model.robust_mvd_model import RobustMVDModel
-import utils.vis as vis
-
-
-def transform_from_rot_trans(R, t):
-    R = R.reshape(3, 3)
-    t = t.reshape(3, 1)
-    return np.vstack((np.hstack([R, t]), [0, 0, 0, 1])).astype(np.float32)
-
-
-def invert_transform(T):
-    R = T[0:3, 0:3]
-    t = T[0:3, 3]
-    R_inv = R.T
-    t_inv = np.dot(-R.T, t)
-    return transform_from_rot_trans(R_inv, t_inv)
+from rmvd import create_model, list_models
+from rmvd.utils import invert_transform
 
 
 def preprocess_view(image, intrinsics, to_ref_transform):
@@ -30,20 +18,15 @@ def preprocess_view(image, intrinsics, to_ref_transform):
     h_in = int(math.ceil(h_orig / 64.0) * 64.0)
     w_in = int(math.ceil(w_orig / 64.0) * 64.0)
 
-    image = image.resize((w_in, h_in), Image.BILINEAR)
+    image = image.resize((w_in, h_in), Image.Resampling.BILINEAR)
     image = np.array(image)
-    image = ((image / 255.0) - 0.4).astype(np.float32)
-    image = np.transpose(image, [2, 0, 1])
-    image = np.expand_dims(image, 0)  # 1, 3, H, W
-    image = torch.from_numpy(image).float().cuda()
+    image = image.astype(np.float32).transpose([2, 0, 1])
 
     scale_arr = np.array([[1 / w_orig] * 3, [1 / h_orig] * 3, [1.] * 3])
     intrinsics *= scale_arr
-    intrinsics = np.expand_dims(np.expand_dims(intrinsics, axis=0), axis=0).astype(np.float32)
-    intrinsics = torch.from_numpy(intrinsics).float().cuda()
+    intrinsics = intrinsics.astype(np.float32)
 
-    to_ref_transform = np.expand_dims(np.expand_dims(to_ref_transform, axis=0), axis=0).astype(np.float32)
-    to_ref_transform = torch.from_numpy(to_ref_transform).float().cuda()
+    to_ref_transform = to_ref_transform.astype(np.float32)
 
     return image, intrinsics, to_ref_transform
 
@@ -57,66 +40,91 @@ def load_data(path):
     intrinsics_key = np.load(osp.join(key_path, 'K.npy'))
     key_to_ref_transform = np.load(osp.join(key_path, 'to_ref_transform.npy'))
     ref_to_key_transform = invert_transform(key_to_ref_transform)
+    key_to_key_transform = key_to_ref_transform.dot(ref_to_key_transform)
     w_orig, h_orig = image_key.size
     image_key, intrinsics_key, _ = preprocess_view(image_key, intrinsics_key, key_to_ref_transform)
 
     images_source = []
     source_to_key_transforms = []
-    intrinsics_sources = []
+    intrinsics_source = []
     for src_path in src_paths:
         image_source = Image.open(osp.join(src_path, 'image.png'))
-        intrinsics_source = np.load(osp.join(src_path, 'K.npy'))
+        intrinsic_source = np.load(osp.join(src_path, 'K.npy'))
         source_to_ref_transform = np.load(osp.join(src_path, 'to_ref_transform.npy'))
         source_to_key_transform = np.dot(source_to_ref_transform, ref_to_key_transform)
-        image_source, intrinsics_source, source_to_key_transform = preprocess_view(image_source, intrinsics_source, source_to_key_transform)
+        image_source, intrinsic_source, source_to_key_transform = \
+            preprocess_view(image_source, intrinsic_source, source_to_key_transform)
 
         images_source.append(image_source)
         source_to_key_transforms.append(source_to_key_transform)
-        intrinsics_sources.append(intrinsics_source)
+        intrinsics_source.append(intrinsic_source)
 
-    return image_key, intrinsics_key, images_source, source_to_key_transforms, intrinsics_sources, h_orig, w_orig
+    sample = {
+        'images': [image_key] + images_source,
+        'intrinsics': [intrinsics_key] + intrinsics_source,
+        'poses': [key_to_key_transform] + source_to_key_transforms,
+        'keyview_idx': 0,
+    }
+
+    return sample, h_orig, w_orig
 
 
-def write_pred(pred_invdepth, pred_uncertainty, pred_depth):
-    os.makedirs(args.output, exist_ok=True)
-    np.save(osp.join(args.output, "pred_invdepth.npy"), pred_invdepth)
-    np.save(osp.join(args.output, "pred_uncertainty.npy"), pred_uncertainty)
-    np.save(osp.join(args.output, "pred_depth.npy"), pred_depth)
+def write_pred(pred, output_path, h_orig, w_orig):
+    pred_depth = pred['depth']
+    pred_depth = resize(pred_depth, list(pred_depth.shape[:-2]) + [h_orig, w_orig], order=0, anti_aliasing=False)
 
-    vis.np2d(pred_invdepth).save(osp.join(args.output, "pred_invdepth.png"))
-    vis.np2d(pred_depth).save(osp.join(args.output, "pred_depth.png"))
-    vis.np2d(pred_uncertainty, image_range_text_off=True).save(osp.join(args.output, "pred_uncertainty.png"))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        pred_invdepth = np.nan_to_num(1 / pred_depth, copy=False, nan=0, posinf=0, neginf=0)
+
+    np.save(osp.join(output_path, "pred_depth.npy"), pred_depth)
+    np.save(osp.join(output_path, "pred_invdepth.npy"), pred_invdepth)
+
+    if 'depth_uncertainty' in pred:
+        pred_depth_uncertainty = pred['depth_uncertainty']
+        pred_depth_uncertainty = resize(pred_depth_uncertainty,
+                                        list(pred_depth_uncertainty.shape[:-2]) + [h_orig, w_orig],
+                                        order=0, anti_aliasing=False)
+        np.save(osp.join(args.output_path, "pred_depth_uncertainty.npy"), pred_depth_uncertainty)
+
+    # TODO:
+    # vis.np2d(pred_invdepth).save(osp.join(args.output, "pred_invdepth.png"))
+    # vis.np2d(pred_depth).save(osp.join(args.output, "pred_depth.png"))
+    # vis.np2d(pred_uncertainty, image_range_text_off=True).save(osp.join(args.output, "pred_uncertainty.png"))
 
 
 @torch.no_grad()
 def run(args):
-    print("Processing data from {} with weights from {}.".format(args.input, args.weights))
 
-    model = RobustMVDModel()
-    model.load_state_dict(torch.load(args.weights))
-    model.cuda()
-    model.eval()
+    if args.model is None:
+        print(f"No model specified. Available models are: {', '.join(list_models())}")
+        return
 
-    image_key, intrinsics_key, images_source, source_to_key_transforms, intrinsics_sources, h_orig, w_orig = load_data(args.input)
-    pred = model(image_key, intrinsics_key, images_source, source_to_key_transforms, intrinsics_sources)
+    print(f"Running inference on data from {args.input_path} with model {args.model}.")
 
-    pred_invdepth = pred['pred_invdepth'].cpu().numpy()
-    pred_uncertainty = pred['pred_invdepth_uncertainty'].cpu().numpy()
+    os.makedirs(args.output_path, exist_ok=True)
+    with open(osp.join(args.output_path, "cmd.txt"), 'w') as f:
+        f.write("python " + " ".join(sys.argv))
 
-    pred_invdepth = np.array(Image.fromarray(pred_invdepth.squeeze()).resize((w_orig, h_orig), Image.NEAREST)).astype(np.float32)
-    pred_uncertainty = np.array(Image.fromarray(pred_uncertainty.squeeze()).resize((w_orig, h_orig), Image.NEAREST)).astype(np.float32)
-    pred_depth = 1 / (pred_invdepth + 1e-9)
+    model = create_model(name=args.model, weights=args.weights, train=False, num_gpus=args.num_gpus)
+    sample, h_orig, w_orig = load_data(args.input_path)
+    pred, _ = model.run(**sample)
+    write_pred(pred, args.output_path, h_orig, w_orig)
 
-    write_pred(pred_invdepth, pred_uncertainty, pred_depth)
-
-    print("Done. Output written to {}.".format(args.output))
+    print("Done. Output written to {}.".format(args.output_path))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', default="sample_data", help="Path to folder with input data.")
-    parser.add_argument('--output', default="sample_data/out", help="Path to folder for output data.")
-    parser.add_argument('--weights', default="weights/robustmvd.pt", help="Weights for the Robust MVD model.")
+    parser.add_argument('--input_path', default="sample_data", help="Path to folder with input data.")
+    parser.add_argument('--output_path', default="sample_data/out", help="Path to folder for output data.")
+
+    parser.add_argument('--model', help=f"Model for evaluation. Available models are: {', '.join(list_models())}")
+    parser.add_argument('--weights', help="Path to weights of the model. Optional. If None, default weights are used.")
+    parser.add_argument('--num_gpus', type=int, help="Number of GPUs. 0 means use CPU. Default: use 1 GPU.", default=1)
+
+    # TODO:
+    # parser.add_argument('--input_width', type=int, help="Input image width.")
+    # parser.add_argument('--input_height', type=int, help="Input image height.")
     args = parser.parse_args()
 
     run(args)

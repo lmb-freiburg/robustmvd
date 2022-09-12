@@ -133,7 +133,7 @@ def sparsification(gt, pred, uncertainty, mask=None, error_fct=m_rel_ae, show_pb
     """
     mask = (gt > 0).astype(np.float32) * mask if mask is not None else (gt > 0).astype(np.float32)
 
-    y, x = np.unravel_index(np.argsort(uncertainty * mask, axis=None), uncertainty.shape)
+    y, x = np.unravel_index(np.argsort((uncertainty - uncertainty.min() + 1) * mask, axis=None), uncertainty.shape)
     # (masking out values that are anyways not considered for computing the error)
     ranking = np.flip(np.stack((x, y), axis=1), 0).tolist()
 
@@ -152,8 +152,7 @@ def sparsification(gt, pred, uncertainty, mask=None, error_fct=m_rel_ae, show_pb
             break
 
         if mask[y, x] == 0:
-            print("HERE! This should never happen.")  # TODO: REMOVE
-            continue
+            raise RuntimeError('This should never happen. If it happens, please open a GitHub issue.')
 
         if num_masked in sparsification_steps:
             cur_error = error_fct(gt=gt, pred=pred, mask=mask)

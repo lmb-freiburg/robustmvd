@@ -5,7 +5,7 @@ Based on the model registry from the timm package ( https://github.com/rwightman
 """
 
 
-from robd.eval import list_evaluations
+from rmvd.eval import list_evaluations
 
 
 _datasets = {}  # keys are (base_dataset, dataset_type, split)

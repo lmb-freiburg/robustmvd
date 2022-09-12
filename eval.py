@@ -4,7 +4,7 @@ import os.path as osp
 
 import torch
 
-from robd import create_model, list_models, create_dataset, list_datasets, create_evaluation, list_evaluations
+from rmvd import create_model, list_models, create_dataset, list_datasets, create_evaluation, list_evaluations
 
 
 @torch.no_grad()
