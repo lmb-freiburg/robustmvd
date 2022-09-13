@@ -6,3 +6,6 @@
 
 [blendedmvs]
     root = '/tmp/blendedmvs/'
+
+[kitti]
+    root = '/tmp/kitti/'

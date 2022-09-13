@@ -18,4 +18,5 @@ def create_model(name, pretrained=True, weights=None, train=False, num_gpus=1, *
     model_entrypoint = get_model(name=name)
     model = model_entrypoint(pretrained=pretrained, weights=weights, train=train, num_gpus=num_gpus, **kwargs)
     add_run_function(model)
+    model.name = name
     return model

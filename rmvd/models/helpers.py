@@ -9,7 +9,7 @@ import collections
 import torch
 from torch.hub import load_state_dict_from_url
 
-from typing import Callable, Optional, Dict
+from typing import Callable, Optional, Dict, Callable
 
 from rmvd.utils import numpy_collate
 
@@ -94,6 +94,7 @@ def build_model_with_cfg(
         weights: Optional[str] = None,
         train: bool = False,
         num_gpus: int = 1,
+        preprocess_weights_fct: Optional[Callable] = None,
         **kwargs):
     """Builds a model with a given config and restores weights.
 
@@ -103,6 +104,7 @@ def build_model_with_cfg(
         weights: Path to model weights.
         train: Whether to put the model in train mode.
         num_gpus: Number of GPUs to be used from the model.
+        preprocess_weights_fct: Function that is applied to the weights before loading them with the model.
 
     Returns:
         Model.
@@ -122,6 +124,9 @@ def build_model_with_cfg(
             print(f'Using model weights from url {weights}.')
             state_dict = load_state_dict_from_url(weights, map_location='cpu', progress=_DOWNLOAD_PROGRESS,
                                                   check_hash=_CHECK_HASH)
+
+        if preprocess_weights_fct is not None:
+            state_dict = preprocess_weights_fct(state_dict)
 
         model.load_state_dict(state_dict, strict=True)
 

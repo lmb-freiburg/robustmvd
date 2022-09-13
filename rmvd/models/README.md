@@ -130,6 +130,17 @@ If you want to use your own model within the framework, e.g. for evaluation, you
 
 Note: you don't have to add a `run` function your model. If required, this function will be added automatically.
 
+## Available models
+
+### `robust_mvd`
+This is the Robust MVD Baseline Model presented in the publication 
+"A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al., but trained for 5M iterations instead
+of the 600k iterations in the paper. The longer training slightly improves results. 
+
+### `robust_mvd_600k`
+This is the Robust MVD Baseline Model presented in the publication 
+"A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al.
+
 ## Wrapped Models
 
 The framework contains two types of model implementations:

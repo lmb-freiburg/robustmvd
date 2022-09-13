@@ -10,25 +10,7 @@ from PIL import Image
 from skimage.transform import resize
 
 from rmvd import create_model, list_models
-from rmvd.utils import invert_transform
-
-
-def preprocess_view(image, intrinsics, to_ref_transform):
-    w_orig, h_orig = image.size
-    h_in = int(math.ceil(h_orig / 64.0) * 64.0)
-    w_in = int(math.ceil(w_orig / 64.0) * 64.0)
-
-    image = image.resize((w_in, h_in), Image.Resampling.BILINEAR)
-    image = np.array(image)
-    image = image.astype(np.float32).transpose([2, 0, 1])
-
-    scale_arr = np.array([[1 / w_orig] * 3, [1 / h_orig] * 3, [1.] * 3])
-    intrinsics *= scale_arr
-    intrinsics = intrinsics.astype(np.float32)
-
-    to_ref_transform = to_ref_transform.astype(np.float32)
-
-    return image, intrinsics, to_ref_transform
+from rmvd.utils import invert_transform, vis
 
 
 def load_data(path):
@@ -36,24 +18,21 @@ def load_data(path):
     src_path = osp.join(path, "source")
     src_paths = sorted([osp.join(src_path, x) for x in os.listdir(src_path)])
 
-    image_key = Image.open(osp.join(key_path, 'image.png'))
+    image_key = np.array(Image.open(osp.join(key_path, 'image.png')), dtype=np.float32).transpose(2, 0, 1)
     intrinsics_key = np.load(osp.join(key_path, 'K.npy'))
     key_to_ref_transform = np.load(osp.join(key_path, 'to_ref_transform.npy'))
     ref_to_key_transform = invert_transform(key_to_ref_transform)
     key_to_key_transform = key_to_ref_transform.dot(ref_to_key_transform)
-    w_orig, h_orig = image_key.size
-    image_key, intrinsics_key, _ = preprocess_view(image_key, intrinsics_key, key_to_ref_transform)
+    h_orig, w_orig = image_key.shape[-2:]
 
     images_source = []
     source_to_key_transforms = []
     intrinsics_source = []
     for src_path in src_paths:
-        image_source = Image.open(osp.join(src_path, 'image.png'))
+        image_source = np.array(Image.open(osp.join(src_path, 'image.png')), dtype=np.float32).transpose(2, 0, 1)
         intrinsic_source = np.load(osp.join(src_path, 'K.npy'))
         source_to_ref_transform = np.load(osp.join(src_path, 'to_ref_transform.npy'))
         source_to_key_transform = np.dot(source_to_ref_transform, ref_to_key_transform)
-        image_source, intrinsic_source, source_to_key_transform = \
-            preprocess_view(image_source, intrinsic_source, source_to_key_transform)
 
         images_source.append(image_source)
         source_to_key_transforms.append(source_to_key_transform)
@@ -78,6 +57,8 @@ def write_pred(pred, output_path, h_orig, w_orig):
 
     np.save(osp.join(output_path, "pred_depth.npy"), pred_depth)
     np.save(osp.join(output_path, "pred_invdepth.npy"), pred_invdepth)
+    vis(pred_invdepth).save(osp.join(args.output_path, "pred_invdepth.png"))
+    vis(pred_depth).save(osp.join(args.output_path, "pred_depth.png"))
 
     if 'depth_uncertainty' in pred:
         pred_depth_uncertainty = pred['depth_uncertainty']
@@ -85,11 +66,8 @@ def write_pred(pred, output_path, h_orig, w_orig):
                                         list(pred_depth_uncertainty.shape[:-2]) + [h_orig, w_orig],
                                         order=0, anti_aliasing=False)
         np.save(osp.join(args.output_path, "pred_depth_uncertainty.npy"), pred_depth_uncertainty)
-
-    # TODO:
-    # vis.np2d(pred_invdepth).save(osp.join(args.output, "pred_invdepth.png"))
-    # vis.np2d(pred_depth).save(osp.join(args.output, "pred_depth.png"))
-    # vis.np2d(pred_uncertainty, image_range_text_off=True).save(osp.join(args.output, "pred_uncertainty.png"))
+        vis(pred_depth_uncertainty, image_range_text_off=True).save(
+            osp.join(args.output_path, "pred_depth_uncertainty.png"))
 
 
 @torch.no_grad()

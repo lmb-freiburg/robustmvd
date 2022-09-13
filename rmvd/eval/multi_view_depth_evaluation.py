@@ -10,7 +10,7 @@ import skimage.transform
 import numpy as np
 import pandas as pd
 
-from rmvd.utils import numpy_collate
+from rmvd.utils import numpy_collate, vis
 from .metrics import m_rel_ae, pointwise_rel_ae, thresh_inliers, sparsification
 
 
@@ -21,7 +21,7 @@ class MultiViewDepthEvaluation:
     """Multi-view depth evaluation.
 
     Can be applied to a dataset and model to evaluate the depth estimation performance of the model on the dataset.
-    Supports multiple evaluation settings, including MVS and depth-from-video.
+    Supports multiple input modalities and an optional alignment between predicted and GT depths.
     Can additionally evaluate the estimated uncertainty of the model if available.
 
     A typical MVS model would set
@@ -67,7 +67,7 @@ class MultiViewDepthEvaluation:
                  view_ordering: str = "quasi-optimal",
                  max_source_views: Optional[int]=None,
                  eval_uncertainty: bool=True,
-                 clip_pred_depth: Union[bool, Tuple[float, float], None] = (0.1, 100),
+                 clip_pred_depth: Union[bool, Tuple[float, float]] = True,
                  sparse_pred: bool=False,
                  verbose: bool=True,
                  ):
@@ -134,8 +134,6 @@ class MultiViewDepthEvaluation:
     def __call__(self,
                  dataset,
                  model,
-                 input_adapter_fct=None,
-                 output_adapter_fct=None,
                  samples: Optional[Union[int, Sequence[int]]]=None,
                  qualitatives: Union[int, Sequence[int]]=10,
                  burn_in_samples: int=3,):
@@ -144,10 +142,6 @@ class MultiViewDepthEvaluation:
         Args:
             dataset: Dataset for the evaluation.
             model: Class or function that applies the model to a sample.
-            input_adapter_fct: Function that adapts sample format of the evaluation to the format required by the model.
-                Will be excluded from the model runtime measurements. Optional.
-            output_adapter_fct: Function that adapts output of the model to the format of the evaluation.
-                Will be excluded from the model runtime measurements. Optional.
             samples: Integer that indicates the number of samples that should be evaluated or list that indicates
                 the indices of samples that should be evaluated. None evaluates all samples.
             qualitatives: Integer that indicates the number of qualitatives that should be logged or list that indicates
@@ -293,7 +287,7 @@ class MultiViewDepthEvaluation:
                 # TODO reorder qualitatives, logging and uncertainty evaluation; maybe first put uncertainty metrics into best_metrics
 
             if self.verbose:
-                print(f"Test sample #{self.cur_sample_idx} has AbsRel={best_metrics['absrel']} "
+                print(f"Sample with index {self.cur_sample_idx} has AbsRel={best_metrics['absrel']} "
                       f"with {best_num_source_views} source views.\n")
 
         eval_end = time.time()
@@ -323,8 +317,9 @@ class MultiViewDepthEvaluation:
     def _log_qualitatives(self, qualitatives):
 
         for qualitative_name, qualitative in qualitatives.items():
-            out_path = osp.join(self.qualitatives_dir, f'{self.cur_sample_idx:07d}-{qualitative_name}.npy')
-            np.save(out_path, qualitative)
+            out_path = osp.join(self.qualitatives_dir, f'{self.cur_sample_idx:07d}-{qualitative_name}')
+            np.save(out_path + '.npy', qualitative)
+            vis(qualitative).save(out_path + '.png')
 
             # TODO self.add_update(sample_num, qualitative_name, out_path, is_info=False)
 
@@ -446,7 +441,9 @@ class MultiViewDepthEvaluation:
 
             pred['scaling_factor'] = ratio
 
-        if self.clip_pred_depth:
+        if isinstance(self.clip_pred_depth, tuple):
+            pred_depth = np.clip(pred_depth, self.clip_pred_depth[0], self.clip_pred_depth[1]) * pred_mask
+        elif self.clip_pred_depth:
             pred_depth = np.clip(pred_depth, 0.1, 100) * pred_mask
 
         with np.errstate(divide='ignore', invalid='ignore'):

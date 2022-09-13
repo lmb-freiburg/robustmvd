@@ -1,16 +1,12 @@
 # Datasets
 
-Multiple existing datasets are supported. The datasets come in three different types:
-- Multi-view depth (mvd): each sample contains multiple views and one view is assigned as keyview
-- Multi-view stereo (mvs): each sample contains all available views of a scene
-- Depth-from-video (v2d): each sample contains a video (i.e. sequence of views)
-
-The following datasets are supported:
+Currently, the `rmvd` framework supports the following datasets:
 - KITTI
 - ETH3D
-- Sintel
-- ScanNet
-- Cityscapes
+
+Datasets can come in different types, depending on the structure of the provided data.
+Currently only one type is supported:
+- Multi-view depth (mvd): each sample contains multiple views and one view is assigned as keyview
 
 Some datasets have different splits, e.g. `train` and `test`, or some custom splits, e.g. the `Eigen` split of KITTI.
 
@@ -27,31 +23,17 @@ Execute the script `scripts/download_eth3d.sh` and specify the download target d
 ```
 Then specify the download directory (`/path/to/download/dir`) in the `paths.toml` file.
 
-### FlyingThings3D
-Download FlyingThings3D from 
-[the dataset website](https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html). You 
-need the following files:
-- RGB images (cleanpass) from the "full dataset"
-- Disparity from the "full dataset"
-- Camera data from the "full dataset"
+### KITTI
+Download the KITTI raw data from https://www.cvlibs.net/datasets/kitti/raw_data.php using
+the "raw dataset download script (1 MB)" that is provided on the website. You need to register for this, 
+herefore we can't provide a download script here. Move the "raw dataset download script" called `raw_data_downloader.sh`
+to a directory `/path/to/KITTI/raw_data` and execute it there.
 
-Extract all downloaded files in the same directory, e.g. `/path/to/FlyingThings3D`. The dataloader requires a different
-storage structure than the original dataset. Execute the script `scripts/convert_flyingthings3d.py` to create the 
-required storage structure in a directory called `/path/to/FlyingThings3D_converted`:
-```bash
-./scripts/convert_flyingthings3d.py /path/to/FlyingThings3D /path/to/FlyingThings3D_converted
-```
+Download the file "annotated depth maps data set (14 GB)" from 
+https://www.cvlibs.net/datasets/kitti/eval_depth_all.php . Move it to a directory 
+`/path/to/KITTI/depth_completion_prediction/` and extract it there.
 
-Note that the script partially creates links in the `/path/to/FlyingThings3D_converted` directory, instead of
-copying the actual files.
-
-Then specify the converted directory (`/path/to/FlyingThings3D_converted`) in the `paths.toml` file.
-
-### BlendedMVS
-Download the BlendedMVS low-res set (27.5GB) from https://github.com/YoYo000/BlendedMVS. Extract the files to a
-directory `/path/to/blendedmvs` (should then contain the scene folders, e.g. 
-`/path/to/blendedmvs/57f8d9bbe73f6760f10e916a`) and specify the
-directory (`/path/to/blendedmvs`) in the `paths.toml` file.
+Then specify the KITTI directory `/path/to/KITTI` in the `paths.toml` file.
 
 ## Data format
 Depending on the dataset type, the data is provided in a specific format. 
@@ -196,3 +178,19 @@ from rmvd.utils import numpy_collate
 dataset = create_dataset("eth3d.mvd", input_size=(384, 576))
 dataloader = dataset.get_loader(batch_size=4, shuffle=False, num_workers=2, collate_fn=numpy_collate)
 ```
+
+## Dataset splits
+
+### ETH3D
+#### `robustmvd` split
+This is the split introduced in "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al. It is based
+on the training split of the ETH3D High-res multi-view data, which consists of 13 sequences with in total 454 views.
+For the `robustmvd` split, samples are defined based on 8 views of each sequence, resulting in a total of 104 samples.
+
+### KITTI
+#### `robustmvd` split
+This is the split introduced in "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al. 
+It is based on the commonly used Eigen test split, which contains 697 samples. It uses only samples of the Eigen
+split where dense ground truth depth from Uhrig et al. is available (652 samples), and where ground truth poses
+from the KITTI odometry benchmark are available (95 samples). It uses only samples where 10 views before
+and 10 views after are available. This additional restriction leads to the final split with 93 samples.

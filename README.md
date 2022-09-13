@@ -44,6 +44,10 @@ Evaluation is done with the script `eval.py`, for example:
 ```bash
 python eval.py --model robust_mvd --dataset eth3d --setting mvd --input poses intrinsics --output /tmp/eval_output --input_width 1152 --input_height 768
 ```
+or:
+```bash
+python eval.py --model robust_mvd --dataset kitti --setting mvd --input poses intrinsics --output /tmp/eval_output
+```
 
 The parameters `model`, `dataset` and `setting` are required. Note that not all models and datasets support all
 evaluation settings. For an overview, see the [models](rmvd/models/README.md) and [data](rmvd/data/README.md) readme.
@@ -58,11 +62,12 @@ import rmvd
 model = rmvd.create_model("robust_mvd", num_gpus=1)  # call with num_gpus=0 for CPU usage
 eval = rmvd.create_evaluation(evaluation_type="mvd", out_dir="/tmp/eval_output", inputs=["intrinsics", "poses"])
 dataset = rmvd.create_dataset("eth3d", "mvd", input_size=(384, 576))
+# alternative: dataset = rmvd.create_dataset("kitti", "mvd", input_size=(384, 1280))
 results = eval(dataset=dataset, model=model)
 ```
 
-Further details (e.g. additional function parameters, overview of available models, evaluations and datasets, ..)
-are described in the READMEs mentioned above.
+For further details (e.g. additional function parameters, overview of available models, evaluations and datasets, ..),
+see the READMEs mentioned above.
 
 ### Inference script
 Evaluation is done with the script `inference.py`, for example:
@@ -131,7 +136,7 @@ The following describes how to evaluate on the benchmark.
 This is the official repository for the publication:
 > **A Benchmark and a Baseline for Robust Multi-view Depth Estimation**
 >
-> [Philipp Schröppel*](https://lmb.informatik.uni-freiburg.de/people/schroepp), [Jan Bechtold*](https://lmb.informatik.uni-freiburg.de/people/bechtolj), [Artemij Amiranashvili](https://lmb.informatik.uni-freiburg.de/people/amiranas) and [Thomas Brox](https://lmb.informatik.uni-freiburg.de/people/brox)
+> [Philipp Schröppel](https://lmb.informatik.uni-freiburg.de/people/schroepp), [Jan Bechtold](https://lmb.informatik.uni-freiburg.de/people/bechtolj), [Artemij Amiranashvili](https://lmb.informatik.uni-freiburg.de/people/amiranas) and [Thomas Brox](https://lmb.informatik.uni-freiburg.de/people/brox)
 > 
 > **3DV 2022**
 

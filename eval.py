@@ -33,7 +33,6 @@ def eval(args):
                              out_dir=args.output,
                              inputs=inputs,
                              eval_uncertainty=args.eval_uncertainty)
-    # TODO: how to deal with that different evaluations will accept different input params?
 
     with open(osp.join(args.output, "cmd.txt"), 'w') as f:
         f.write("python " + " ".join(sys.argv))
@@ -72,8 +71,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--eval_uncertainty', action='store_true', help='Evaluate predicted depth uncertainty.')
 
-    parser.add_argument('--input_width', type=int, help="Input image width.")  # TODO: add text what happens if not provided
-    parser.add_argument('--input_height', type=int, help="Input image height.")
+    parser.add_argument('--input_width', type=int, help="Input image width. If not provided, scales images up to the "
+                                                        "nearest width that works with the model.")
+    parser.add_argument('--input_height', type=int, help="Input image height. If not provided, scales images up to the "
+                                                         "nearest height that works with the model.")
     args = parser.parse_args()
 
     eval(args)
