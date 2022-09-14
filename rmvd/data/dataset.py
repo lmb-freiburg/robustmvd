@@ -44,6 +44,8 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
         if self.verbose:
             print(f"\tNumber of samples: {len(self)}")
+            if self.resize is not None:
+                print(f"\tImage resolution (height, width): ({input_size[0]}, {input_size[1]})")
             print(f"Finished initializing dataset {self.name}.")
             print()
 

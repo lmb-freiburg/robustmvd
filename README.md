@@ -42,11 +42,11 @@ The setup and interface of the models is explained in [rmvd/models/README.md](rm
 ### Evaluation script
 Evaluation is done with the script `eval.py`, for example:
 ```bash
-python eval.py --model robust_mvd --dataset eth3d --setting mvd --input poses intrinsics --output /tmp/eval_output --input_width 1152 --input_height 768
+python eval.py --model robust_mvd --dataset eth3d --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 768 1152 
 ```
 or:
 ```bash
-python eval.py --model robust_mvd --dataset kitti --setting mvd --input poses intrinsics --output /tmp/eval_output
+python eval.py --model robust_mvd --dataset kitti --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 384 1280
 ```
 
 The parameters `model`, `dataset` and `setting` are required. Note that not all models and datasets support all
@@ -100,8 +100,9 @@ Within this package, we use the following conventions:
 
 ## Robust Multi-view Depth Benchmark
 
-The Robust Multi-view Depth Benchmark aims to evaluate robust multi-view depth estimation on arbitrary real-world data.
-As proxy for this, it uses test sets based on multiple diverse, existing datasets and evaluates in a zero-shot fashion.
+The Robust Multi-view Depth Benchmark (Robust MVD) aims to evaluate robust multi-view depth estimation on arbitrary 
+real-world data. As proxy for this, it uses test sets based on multiple diverse, existing datasets and evaluates in 
+a zero-shot fashion.
 
 It supports multiple different input modalities:
 - images
@@ -120,12 +121,37 @@ Depth and uncertainty estimation performance is measured with the following metr
 The following describes how to evaluate on the benchmark.
 
 ### Evaluation of models within the `rmvd` framework
+Evaluation on the benchmark is done with the script `eval.py`:
+```bash
+python eval.py --model robust_mvd --eval_type robustmvd --input poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280
+```
+
+### Programmatic evaluation
+
+It is also possible to run evaluation on the benchmark from python code, for example with:
+```python
+import rmvd
+model = rmvd.create_model("robust_mvd", num_gpus=1)  # call with num_gpus=0 for CPU usage
+eval = rmvd.create_evaluation(evaluation_type="robustmvd", out_dir="/tmp/eval_benchmark", inputs=["intrinsics", "poses"])
+results = eval(model=model, eth3d_size=(768, 1152), kitti_size=(384, 1280))
+```
 
 ### Evaluation of custom models
 
+With the programmatic evaluation described above, it is possible to evaluate custom models on the Robust MVD Benchmark.
+
+The only constraint is that the custom model that is passed to `eval(model=model, ..)` needs to have the following 
+functions:
+- a `input_adapter` function
+- a `__call__` function (in `torch` basically equivalent to the `forward` function) 
+- a `output_adapter` function
+
+These functions are basically used to convert data between the formats of the `rmvd` framework and the model-specific
+format and to call the model. For details about these functions, see [rmvd/models/README.md](rmvd/models/README.md).
+
 ## TODOs
 - [ ] add all models that were evaluated in the publication to the `rmvd` framework
-- [ ] add more datasets: KITTI, ScanNet, DTU, Tanks and Temples
+- [ ] add more datasets: ScanNet, DTU, Tanks and Temples
 - [ ] add project page including an overview of the benchmark and a leaderboard
 - [ ] add code to train the models
 

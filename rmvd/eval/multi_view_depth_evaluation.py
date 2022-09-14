@@ -61,15 +61,15 @@ class MultiViewDepthEvaluation:
         verbose: Print evaluation details.
     """
     def __init__(self,
-                 out_dir: Optional[str]=None,
-                 inputs: Sequence[str]=None,
-                 alignment: Optional[str]=None,
+                 out_dir: Optional[str] = None,
+                 inputs: Sequence[str] = None,
+                 alignment: Optional[str] = None,
                  view_ordering: str = "quasi-optimal",
-                 max_source_views: Optional[int]=None,
-                 eval_uncertainty: bool=True,
+                 max_source_views: Optional[int] = None,
+                 eval_uncertainty: bool = True,
                  clip_pred_depth: Union[bool, Tuple[float, float]] = True,
-                 sparse_pred: bool=False,
-                 verbose: bool=True,
+                 sparse_pred: bool = False,
+                 verbose: bool = True,
                  ):
 
         self.verbose = verbose
@@ -131,12 +131,14 @@ class MultiViewDepthEvaluation:
             ret += "\n\tOutput directory: None. Results will not be written to disk!"
         return ret
 
+    @torch.no_grad()
     def __call__(self,
                  dataset,
                  model,
-                 samples: Optional[Union[int, Sequence[int]]]=None,
-                 qualitatives: Union[int, Sequence[int]]=10,
-                 burn_in_samples: int=3,):
+                 samples: Optional[Union[int, Sequence[int]]] = None,
+                 qualitatives: Union[int, Sequence[int]] = 10,
+                 burn_in_samples: int = 3,
+                 **_):
         """Run depth evaluation for a dataset and model.
 
         Args:
