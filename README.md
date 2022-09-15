@@ -1,5 +1,5 @@
 # Robust Multi-view Depth
-[**Paper**](TODO) | [**Video**](TODO) | [**Project Page**](TODO)
+[**Paper**](http://arxiv.org/abs/2209.06681) | [**Video**](TODO) | [**Project Page**](TODO)
 
 **Robust** **M**ulti-**v**iew **D**epth (`robustmvd`) is a benchmark and framework for depth estimation 
 from multiple input views with a focus on robust application independent of the target data. 
@@ -49,8 +49,7 @@ or:
 python eval.py --model robust_mvd --dataset kitti --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 384 1280
 ```
 
-The parameters `model`, `dataset` and `setting` are required. Note that not all models and datasets support all
-evaluation settings. For an overview, see the [models](rmvd/models/README.md) and [data](rmvd/data/README.md) readme.
+The parameters `model`, `dataset` and `eval_type` are required. 
 
 For further parameters, execute `python eval.py --help`.
 
@@ -76,7 +75,7 @@ python inference.py --model robust_mvd
 ```
 
 ### Programmatic inference
-`rmvd` models can be used programmatically, e.g.:
+Inference with `rmvd` models can be done programmatically, e.g.:
 ```python
 import rmvd
 model = rmvd.create_model("robust_mvd")
