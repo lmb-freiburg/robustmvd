@@ -90,6 +90,7 @@ class RobustMultiViewDepthBenchmark:
                  model,
                  eth3d_size: Optional[Tuple[int, int]] = None,
                  kitti_size: Optional[Tuple[int, int]] = None,
+                 dtu_size: Optional[Tuple[int, int]] = None,
                  qualitatives: Union[int, Sequence[int]] = 2,
                  **_):
         """Run benchmark evaluation for a model.
@@ -106,7 +107,9 @@ class RobustMultiViewDepthBenchmark:
             model_dir = osp.join(self.out_dir, model.name)
             os.makedirs(model_dir, exist_ok=True)
 
-        datasets = [("eth3d.robustmvd.mvd", eth3d_size), ("kitti.robustmvd.mvd", kitti_size)]
+        datasets = [("eth3d.robustmvd.mvd", eth3d_size), ("kitti.robustmvd.mvd", kitti_size),
+                    ("dtu.robustmvd.mvd", dtu_size)]
+
         for dataset_name, input_size in datasets:
             print(f"Running evaluation on {dataset_name}.")
 

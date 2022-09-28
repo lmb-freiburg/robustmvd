@@ -1,5 +1,5 @@
 # Robust Multi-view Depth
-[**Paper**](http://arxiv.org/abs/2209.06681) | [**Video**](TODO) | [**Project Page**](TODO)
+[**Paper**](http://arxiv.org/abs/2209.06681) | Video (Coming soon) | Project page (Coming soon)
 
 **Robust** **M**ulti-**v**iew **D**epth (`robustmvd`) is a benchmark and framework for depth estimation 
 from multiple input views with a focus on robust application independent of the target data. 
@@ -40,13 +40,17 @@ The setup and interface of the dataloaders is explained in [rmvd/data/README.md]
 The setup and interface of the models is explained in [rmvd/models/README.md](rmvd/models/README.md).
 
 ### Evaluation script
-Evaluation is done with the script `eval.py`, for example:
+Evaluation is done with the script `eval.py`, for example on ETH3D:
 ```bash
 python eval.py --model robust_mvd --dataset eth3d --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 768 1152 
 ```
-or:
+On KITTI:
 ```bash
 python eval.py --model robust_mvd --dataset kitti --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 384 1280
+```
+On DTU:
+```bash
+python eval.py --model robust_mvd --dataset dtu --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 896 1216
 ```
 
 The parameters `model`, `dataset` and `eval_type` are required. 
@@ -122,7 +126,7 @@ The following describes how to evaluate on the benchmark.
 ### Evaluation of models within the `rmvd` framework
 Evaluation on the benchmark is done with the script `eval.py`:
 ```bash
-python eval.py --model robust_mvd --eval_type robustmvd --input poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280
+python eval.py --model robust_mvd --eval_type robustmvd --input poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216
 ```
 
 ### Programmatic evaluation
@@ -150,7 +154,7 @@ format and to call the model. For details about these functions, see [rmvd/model
 
 ## TODOs
 - [ ] add all models that were evaluated in the publication to the `rmvd` framework
-- [ ] add more datasets: ScanNet, DTU, Tanks and Temples
+- [ ] add more datasets: ScanNet, Tanks and Temples
 - [ ] add project page including an overview of the benchmark and a leaderboard
 - [ ] add code to train the models
 

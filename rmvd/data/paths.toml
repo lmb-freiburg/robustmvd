@@ -9,3 +9,6 @@
 
 [kitti]
     root = '/tmp/kitti/'
+
+[dtu]
+    root = '/tmp/dtu/'

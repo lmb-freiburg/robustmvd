@@ -121,7 +121,7 @@ the next resolution that can be handled.
 
 The model output is often at a lower resolution as the input data.
 
-## Using a custom model within the `robustmvd` framework
+## Using a custom model within the `rmvd` framework
 
 If you want to use your own model within the framework, e.g. for evaluation, your model needs to have:
 - a `input_adapter` function

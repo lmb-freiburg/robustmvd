@@ -35,6 +35,29 @@ https://www.cvlibs.net/datasets/kitti/eval_depth_all.php . Move it to a director
 
 Then specify the KITTI directory `/path/to/KITTI` in the `paths.toml` file.
 
+### DTU
+1. Download the file `dtu.tar.xz` from https://polybox.ethz.ch/index.php/s/ugDdJQIuZTk4S35 (supplied by the 
+PatchmatchNet repository https://github.com/FangjinhuaWang/PatchmatchNet) and extract it to a 
+directory `/path/to/DTU_raw`. 
+2. Download the rectified images from the original dataset website: 
+http://roboimagedata2.compute.dtu.dk/data/MVS/Rectified.zip and extract it to `/path/to/DTU_raw`.
+3. Download the pointclouds from the original dataset website: 
+http://roboimagedata2.compute.dtu.dk/data/MVS/Points.zip and extract it to `/path/to/DTU_raw`.
+
+The directory `/path/to/DTU_raw` should then contain:
+- a directory called `dtu` that in turn contains directories `Cameras_1`, `Depths_raw`, `Rectified`
+- a directory called `Rectified` that in turn contains directories for individual scans (`scanX`)
+- a directory called `Points` that in turn contains a directory `stl` that in turn contains 
+pointcloud files for individual scans (`stlX_total.ply`)
+
+Then run the script `scripts/convert_dtu.sh` to bring the dataset in the structure that is required by the dataloader:
+```bash
+./scripts/convert_dtu.py /path/to/DTU_raw /path/to/DTU
+```
+
+Then specify the DTU directory (`/path/to/DTU`) in the `paths.toml` file. 
+The directory `/path/to/DTU_raw` can be deleted.
+
 ## Data format
 Depending on the dataset type, the data is provided in a specific format. 
 The following describes the format for each dataset type.
@@ -118,16 +141,16 @@ details on using datasets within dataloaders, see below.
 To create a dataset, use the `create_dataset` function:
 ```python
 from rmvd import create_dataset
-dataset = create_dataset(dataset_name=dataset_name, dataset_type=dataset_type)  # optional: split, e.g. split='train'
+dataset = create_dataset(dataset_name=dataset_name, dataset_type=dataset_type)  # optional: split, e.g. split='robustmvd'
 
 # for example:
-dataset = create_dataset(dataset_name="eth3d", dataset_type="mvd")  # will create the default eth3d.mvd split, which is 'train'
+dataset = create_dataset(dataset_name="eth3d", dataset_type="mvd")  # will create the default eth3d.mvd split, which is 'robustmvd'
 # other options for creating exactly the same dataset:
-dataset = create_dataset(dataset_name="eth3d", dataset_type="mvd", split="train")  # explicitly specify the split
+dataset = create_dataset(dataset_name="eth3d", dataset_type="mvd", split="robustmvd")  # explicitly specify the split
 dataset = create_dataset(dataset_name="eth3d.mvd")  # specify the dataset_type and/or split in the dataset_name param
-dataset = create_dataset(dataset_name="eth3d.train.mvd")
-dataset = create_dataset(dataset_name="eth3d.train", dataset_type="mvd")
-dataset = create_dataset(dataset_name="eth3d.mvd", split="train")
+dataset = create_dataset(dataset_name="eth3d.robustmvd.mvd")
+dataset = create_dataset(dataset_name="eth3d.robustmvd", dataset_type="mvd")
+dataset = create_dataset(dataset_name="eth3d.mvd", split="robustmvd")
 ```
 
 It is required to indicate a dataset name and a dataset type. The split can be specified with the optional 
