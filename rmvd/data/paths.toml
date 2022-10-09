@@ -1,14 +1,20 @@
 [eth3d]
     root = '/tmp/eth3d/'
 
-[flyingthings3d]
-    root = '/tmp/flyingthings3d/'
-
-[blendedmvs]
-    root = '/tmp/blendedmvs/'
-
 [kitti]
     root = '/tmp/kitti/'
 
 [dtu]
     root = '/tmp/dtu/'
+
+[scannet]
+    root = '/tmp/scannet/'
+
+[tanks_and_temples]
+    root = '/tmp/tanks_and_temples/'
+
+[flyingthings3d]
+    root = '/tmp/flyingthings3d/'
+
+[blendedmvs]
+    root = '/tmp/blendedmvs/'

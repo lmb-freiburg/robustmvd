@@ -87,7 +87,7 @@ class DTUSample(Sample):
 
 
 @register_default_dataset
-class DTUTest(Dataset):
+class DTURobustMVD(Dataset):
 
     base_dataset = 'dtu'
     split = 'robustmvd'

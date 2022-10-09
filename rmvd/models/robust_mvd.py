@@ -113,7 +113,7 @@ class RobustMVD(nn.Module):
 
 
 @register_model
-def robust_mvd(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+def robust_mvd_5M(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd.pt'
     weights = pretrained_weights if (pretrained and weights is None) else None
     model = build_model_with_cfg(model_cls=RobustMVD, weights=weights, train=train, num_gpus=num_gpus)
@@ -121,7 +121,7 @@ def robust_mvd(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs)
 
 
 @register_model
-def robust_mvd_600k(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+def robust_mvd(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd_600k.pt'
     weights = pretrained_weights if (pretrained and weights is None) else None
     model = build_model_with_cfg(model_cls=RobustMVD, weights=weights, train=train, num_gpus=num_gpus)

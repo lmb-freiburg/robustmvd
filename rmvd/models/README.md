@@ -134,12 +134,12 @@ Note: you don't have to add a `run` function your model. If required, this funct
 
 ### `robust_mvd`
 This is the Robust MVD Baseline Model presented in the publication 
+"A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al.
+
+### `robust_mvd_5M`
+This is the Robust MVD Baseline Model presented in the publication 
 "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al., but trained for 5M iterations instead
 of the 600k iterations in the paper. The longer training slightly improves results. 
-
-### `robust_mvd_600k`
-This is the Robust MVD Baseline Model presented in the publication 
-"A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al.
 
 ## Wrapped Models
 

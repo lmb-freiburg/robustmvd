@@ -38,14 +38,15 @@ def eval(args):
                              inputs=args.inputs,
                              eval_uncertainty=args.eval_uncertainty)
 
-    with open(osp.join(args.output, "cmd.txt"), 'w') as f:
-        f.write("python " + " ".join(sys.argv))
+    with open(osp.join(args.output, "cmd.txt"), 'a') as f:
+        f.write("python " + " ".join(sys.argv) + "\n")
 
     samples = args.num_samples if args.num_samples is not None else args.samples
     qualitatives = args.qualitatives if args.qualitatives is not None else args.num_qualitatives
 
     eval(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives,
-         eth3d_size=args.eth3d_size, kitti_size=args.kitti_size)
+         eth3d_size=args.eth3d_size, kitti_size=args.kitti_size, dtu_size=args.dtu_size, scannet_size=args.scannet_size,
+         tanks_and_temples_size=args.tanks_and_temples_size)
 
 
 if __name__ == '__main__':
@@ -63,14 +64,14 @@ if __name__ == '__main__':
     parser.add_argument('--output', help="Path to folder for output data.")
 
     parser.add_argument('--num_samples', type=int, help='Number of samples to be evaluated. Default: evaluate all.')
-    parser.add_argument('--sample', dest='samples', type=int, action='append',
+    parser.add_argument('--samples', type=int, nargs='*',
                         help='Index of sample that should be evaluated. Ignored if num_samples is used. '
                              'Default: evaluate all.')
 
     parser.add_argument('--num_qualitatives', type=int, default=10,
                         help='Number of qualitatives to be output. Negative values output all qualitatives. '
                              'Ignored if --qualitative is used. Default: 10.')
-    parser.add_argument('--qualitative', dest='qualitatives', type=int, action='append',
+    parser.add_argument('--qualitatives', type=int, nargs='*',
                         help='Index of sample where qualitatives should be output.')
 
     parser.add_argument('--eval_uncertainty', action='store_true', help='Evaluate predicted depth uncertainty.')
@@ -84,9 +85,18 @@ if __name__ == '__main__':
     # arguments for the "robustmvd" evaluation:
     parser.add_argument('--eth3d_size', type=int, nargs=2, default=[1024, 1536],
                         help="Input image size on ETH3D in the format (height, width). "
-                             "If not provided, scales images up to the size (1024, 1536).")
+                             "If not provided, scales images down to the size (1024, 1536).")
     parser.add_argument('--kitti_size', type=int, nargs=2,
                         help="Input image size on KITTI in the format (height, width). "
+                             "If not provided, scales images up to the nearest size that works with the model.")
+    parser.add_argument('--dtu_size', type=int, nargs=2,
+                        help="Input image size on DTU in the format (height, width). "
+                             "If not provided, scales images up to the nearest size that works with the model.")
+    parser.add_argument('--scannet_size', type=int, nargs=2,
+                        help="Input image size on ScanNet in the format (height, width). "
+                             "If not provided, scales images up to the nearest size that works with the model.")
+    parser.add_argument('--tanks_and_temples_size', type=int, nargs=2,
+                        help="Input image size on Tanks and Temples in the format (height, width). "
                              "If not provided, scales images up to the nearest size that works with the model.")
 
     args = parser.parse_args()

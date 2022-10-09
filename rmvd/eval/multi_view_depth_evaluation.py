@@ -79,11 +79,11 @@ class MultiViewDepthEvaluation:
 
         self.out_dir = out_dir
         if self.out_dir is not None:
-            self.results_dir = osp.join(self.out_dir, "results")
-            self.sample_results_dir = osp.join(self.results_dir, "per_sample")
-            self.qualitatives_dir = osp.join(self.out_dir, "qualitatives")
+            self.quantitatives_dir = osp.join(self.out_dir, "quantitative")
+            self.sample_results_dir = osp.join(self.quantitatives_dir, "per_sample")
+            self.qualitatives_dir = osp.join(self.out_dir, "qualitative")
             os.makedirs(self.out_dir, exist_ok=True)
-            os.makedirs(self.results_dir, exist_ok=True)
+            os.makedirs(self.quantitatives_dir, exist_ok=True)
             os.makedirs(self.sample_results_dir, exist_ok=True)
             os.makedirs(self.qualitatives_dir, exist_ok=True)
 
@@ -194,16 +194,17 @@ class MultiViewDepthEvaluation:
     def _init_qualitative_indices(self, qualitatives=None):
         if qualitatives is None:
             self.qualitative_indices = []
-        if qualitatives < 0:
-            self.qualitative_indices = self.sample_indices
         elif isinstance(qualitatives, list):
             self.qualitative_indices = qualitatives
         elif isinstance(qualitatives, int):
-            step_size = len(self.sample_indices) / qualitatives  # <=1
-            self.qualitative_indices = list(set([self.sample_indices[int(i*step_size)] for i in range(qualitatives)]))
+            if qualitatives < 0:
+                self.qualitative_indices = self.sample_indices
+            else:
+                step_size = len(self.sample_indices) / qualitatives  # <=1
+                self.qualitative_indices = list(
+                    set([self.sample_indices[int(i * step_size)] for i in range(qualitatives)]))
 
     def _evaluate(self):
-        eval_start = time.time()
         for sample_num, (sample_idx, sample) in enumerate(zip(self.sample_indices, self.dataloader)):
             self.cur_sample_num = sample_num
             self.cur_sample_idx = sample_idx
@@ -292,17 +293,14 @@ class MultiViewDepthEvaluation:
                 print(f"Sample with index {self.cur_sample_idx} has AbsRel={best_metrics['absrel']} "
                       f"with {best_num_source_views} source views.\n")
 
-        eval_end = time.time()
-        print(f"Evaluation took {eval_end - eval_start} seconds.")
-
         return self.results
 
     def _compute_qualitatives(self, sample_inputs, sample_gt, pred):
 
-        gt_depth = sample_gt['depth'][0, 0]
+        gt_depth = sample_gt['depth'][0]
 
-        pred_depth = pred['depth'][0, 0]
-        pred_invdepth = pred['invdepth'][0, 0]
+        pred_depth = pred['depth'][0]
+        pred_invdepth = pred['invdepth'][0]
         pred_mask = pred_depth != 0 if self.sparse_pred else np.ones_like(pred_depth, dtype=bool)
 
         pointwise_absrel = pointwise_rel_ae(gt=gt_depth, pred=pred_depth, mask=pred_mask)
@@ -312,7 +310,7 @@ class MultiViewDepthEvaluation:
                         'pred_invdepth': pred_invdepth}
 
         if self.eval_uncertainty:
-            qualitatives['pred_depth_uncertainty'] = pred['depth_uncertainty'][0, 0]
+            qualitatives['pred_depth_uncertainty'] = pred['depth_uncertainty'][0]
 
         return qualitatives
 
@@ -560,13 +558,13 @@ class MultiViewDepthEvaluation:
         if self.out_dir is not None:
             results_per_sample.to_pickle(osp.join(self.sample_results_dir, "results.pickle"))
             results_per_sample.to_csv(osp.join(self.sample_results_dir, "results.csv"))
-            results.to_pickle(osp.join(self.results_dir, "results.pickle"))
-            results.to_csv(osp.join(self.results_dir, "results.csv"))
+            results.to_pickle(osp.join(self.quantitatives_dir, "results.pickle"))
+            results.to_csv(osp.join(self.quantitatives_dir, "results.csv"))
 
             num_source_view_results_per_sample.to_csv(osp.join(self.sample_results_dir, "num_source_view_results.csv"))
             num_source_view_results_per_sample.to_pickle(osp.join(self.sample_results_dir, "num_source_view_results.pickle"))
-            num_source_view_results.to_csv(osp.join(self.results_dir, "num_source_view_results.csv"))
-            num_source_view_results.to_pickle(osp.join(self.results_dir, "num_source_view_results.pickle"))
+            num_source_view_results.to_csv(osp.join(self.quantitatives_dir, "num_source_view_results.csv"))
+            num_source_view_results.to_pickle(osp.join(self.quantitatives_dir, "num_source_view_results.pickle"))
 
             if self.eval_uncertainty:
                 sample_sparsification_curves = self.sparsification_curves
@@ -574,7 +572,7 @@ class MultiViewDepthEvaluation:
                     warnings.simplefilter("ignore", category=FutureWarning)
                     sparsification_curves = sample_sparsification_curves.mean(axis=0, level=1)
 
-                sparsification_curves.to_pickle(osp.join(self.results_dir, "sparsification_curves.pickle"))
-                sparsification_curves.to_csv(osp.join(self.results_dir, "sparsification_curves.csv"))
+                sparsification_curves.to_pickle(osp.join(self.quantitatives_dir, "sparsification_curves.pickle"))
+                sparsification_curves.to_csv(osp.join(self.quantitatives_dir, "sparsification_curves.csv"))
                 sample_sparsification_curves.to_pickle(osp.join(self.sample_results_dir, "sparsification_curves.pickle"))
                 sample_sparsification_curves.to_csv(osp.join(self.sample_results_dir, "sparsification_curves.csv"))

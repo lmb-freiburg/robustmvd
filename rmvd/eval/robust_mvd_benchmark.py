@@ -88,15 +88,30 @@ class RobustMultiViewDepthBenchmark:
     @torch.no_grad()
     def __call__(self,
                  model,
-                 eth3d_size: Optional[Tuple[int, int]] = None,
+                 eth3d_size: Optional[Tuple[int, int]] = (1024, 1536),
                  kitti_size: Optional[Tuple[int, int]] = None,
                  dtu_size: Optional[Tuple[int, int]] = None,
+                 scannet_size: Optional[Tuple[int, int]] = None,
+                 tanks_and_temples_size: Optional[Tuple[int, int]] = None,
+                 samples: Optional[Union[int, Sequence[int]]] = None,
                  qualitatives: Union[int, Sequence[int]] = 2,
                  **_):
-        """Run benchmark evaluation for a model.
+        """Run Robust Multi-view Depth Benchmark evaluation for a model.
 
         Args:
             model: Class or function that applies the model to a sample.
+            eth3d_size: Input image size on ETH3D in the format (height, width).
+                If not provided, scales images down to the size (1024, 1536).
+            kitti_size: Input image size on KITTI in the format (height, width).
+                If not provided, scales images up to the nearest size that works with the model.
+            dtu_size: Input image size on DTU in the format (height, width).
+                If not provided, scales images up to the nearest size that works with the model.
+            scannet_size: Input image size on ScanNet in the format (height, width).
+                If not provided, scales images up to the nearest size that works with the model.
+            tanks_and_temples_size: Input image size on Tanks and Temples in the format (height, width).
+                If not provided, scales images up to the nearest size that works with the model.
+            samples: Integer that indicates the number of samples that should be evaluated or list that indicates
+                the indices of samples that should be evaluated. None evaluates all samples.
             qualitatives: Integer that indicates the number of qualitatives that should be logged or list that indicates
                 the indices of samples for which qualitatives should be logged. -1 logs qualitatives for all samples.
 
@@ -107,8 +122,11 @@ class RobustMultiViewDepthBenchmark:
             model_dir = osp.join(self.out_dir, model.name)
             os.makedirs(model_dir, exist_ok=True)
 
-        datasets = [("eth3d.robustmvd.mvd", eth3d_size), ("kitti.robustmvd.mvd", kitti_size),
-                    ("dtu.robustmvd.mvd", dtu_size)]
+        datasets = [("kitti.robustmvd.mvd", kitti_size),
+                    ("dtu.robustmvd.mvd", dtu_size),
+                    ("scannet.robustmvd.mvd", scannet_size),
+                    ("tanks_and_temples.robustmvd.mvd", tanks_and_temples_size),
+                    ("eth3d.robustmvd.mvd", eth3d_size),]
 
         for dataset_name, input_size in datasets:
             print(f"Running evaluation on {dataset_name}.")
@@ -125,5 +143,6 @@ class RobustMultiViewDepthBenchmark:
                                             sparse_pred=self.sparse_pred, verbose=self.verbose)
 
             dataset = create_dataset(dataset_name=dataset_name, dataset_type="mvd", input_size=input_size)
-            eval(dataset=dataset, model=model, qualitatives=qualitatives, burn_in_samples=3)
+            eval(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives, burn_in_samples=3)
+            print()
         # TODO: add return value

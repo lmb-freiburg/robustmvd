@@ -93,14 +93,14 @@ def pointwise_rel_ae(gt, pred, mask=None, output_scaling_factor=1.0):
     """Computes the pointwise relative-absolute-error for a predicted and ground truth depth map.
 
     Args:
-        gt: Ground truth depth map as numpy array of shape HxW. Negative or 0 values are invalid and ignored.
-        pred: Predicted depth map as numpy array of shape HxW.
-        mask: Array of shape HxW with numerical or boolean values for element weights or validity.
+        gt: Ground truth depth map as numpy array of shape 1HxW. Negative or 0 values are invalid and ignored.
+        pred: Predicted depth map as numpy array of shape 1xHxW.
+        mask: Array of shape 1xHxW with numerical or boolean values for element weights or validity.
             For bool, False means invalid.
         output_scaling_factor: Scaling factor that is applied after computing the metrics (e.g. to get [%]).
 
     Returns:
-        Numpy array of shape HxW with pointwise relative-absolute-error values.
+        Numpy array of shape 1xHxW with pointwise relative-absolute-error values.
     """
     mask = (gt > 0).astype(np.float32) * mask if mask is not None else (gt > 0).astype(np.float32)
 

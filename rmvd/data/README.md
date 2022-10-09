@@ -3,6 +3,9 @@
 Currently, the `rmvd` framework supports the following datasets:
 - KITTI
 - ETH3D
+- DTU
+- ScanNet
+- Tanks and Temples
 
 Datasets can come in different types, depending on the structure of the provided data.
 Currently only one type is supported:
@@ -17,46 +20,74 @@ The root paths of the datasets need to be specified in the file `paths.toml`.
 The following describes the setup for each individual dataset.
 
 ### ETH3D
-Execute the script `scripts/download_eth3d.sh` and specify the download target directory to download the dataset:
+From the directory of this `README` file, execute the script `scripts/download_eth3d.sh` and specify the download 
+target directory to download the dataset:
 ```bash
-./scripts/download_eth3d.sh /path/to/download/dir
+./scripts/download_eth3d.sh /path/to/eth3d
 ```
-Then specify the download directory (`/path/to/download/dir`) in the `paths.toml` file.
+Then specify the download directory (`/path/to/eth3d`) in the `paths.toml` file.
 
 ### KITTI
-Download the KITTI raw data from https://www.cvlibs.net/datasets/kitti/raw_data.php using
+Download the KITTI raw data from <https://www.cvlibs.net/datasets/kitti/raw_data.php> using
 the "raw dataset download script (1 MB)" that is provided on the website. You need to register for this, 
-herefore we can't provide a download script here. Move the "raw dataset download script" called `raw_data_downloader.sh`
-to a directory `/path/to/KITTI/raw_data` and execute it there.
+therefore we can't provide a download script here. Move the "raw dataset download script" called
+`raw_data_downloader.sh` to a directory `/path/to/KITTI/raw_data` and execute it there.
 
 Download the file "annotated depth maps data set (14 GB)" from 
-https://www.cvlibs.net/datasets/kitti/eval_depth_all.php . Move it to a directory 
-`/path/to/KITTI/depth_completion_prediction/` and extract it there.
+<https://www.cvlibs.net/datasets/kitti/eval_depth_all.php>. Move it to a directory 
+`/path/to/KITTI/depth_completion_prediction/` and extract it there. The `data_depth_annotated.zip` file can be deleted.
 
 Then specify the KITTI directory `/path/to/KITTI` in the `paths.toml` file.
 
 ### DTU
-1. Download the file `dtu.tar.xz` from https://polybox.ethz.ch/index.php/s/ugDdJQIuZTk4S35 (supplied by the 
-PatchmatchNet repository https://github.com/FangjinhuaWang/PatchmatchNet) and extract it to a 
-directory `/path/to/DTU_raw`. 
-2. Download the rectified images from the original dataset website: 
-http://roboimagedata2.compute.dtu.dk/data/MVS/Rectified.zip and extract it to `/path/to/DTU_raw`.
-3. Download the pointclouds from the original dataset website: 
-http://roboimagedata2.compute.dtu.dk/data/MVS/Points.zip and extract it to `/path/to/DTU_raw`.
 
-The directory `/path/to/DTU_raw` should then contain:
-- a directory called `dtu` that in turn contains directories `Cameras_1`, `Depths_raw`, `Rectified`
-- a directory called `Rectified` that in turn contains directories for individual scans (`scanX`)
-- a directory called `Points` that in turn contains a directory `stl` that in turn contains 
-pointcloud files for individual scans (`stlX_total.ply`)
+From the directory of this `README` file, execute the script `scripts/download_dtu.sh` and 
+specify the download directory for the dataset:
+```bash
+./scripts/download_dtu.sh /path/to/DTU_raw
+```
 
-Then run the script `scripts/convert_dtu.sh` to bring the dataset in the structure that is required by the dataloader:
+Then, from the directory of this `README` file, execute the script `scripts/convert_dtu.sh` to bring the dataset in the
+structure that is required by the dataloader:
 ```bash
 ./scripts/convert_dtu.py /path/to/DTU_raw /path/to/DTU
 ```
 
 Then specify the DTU directory (`/path/to/DTU`) in the `paths.toml` file. 
 The directory `/path/to/DTU_raw` can be deleted.
+
+### ScanNet
+Download ScanNet by following the official instructions at <https://github.com/ScanNet/ScanNet>. 
+You need to fill out a Terms of Use agreement for this, therefore we can't provide a download script here. 
+You will receive a script named `download-scannet.py` to download the data. 
+Download the full dataset to a directory `/path/to/ScanNet_orig` with this script as follows:
+```bash
+python download-scannet.py -o /path/to/ScanNet_orig/
+```
+
+Then create a new python2.7 virtual environment, e.g. via:
+```bash
+conda create -y -n scannetreader python=2.7
+conda activate scannetreader
+conda install -y numpy imageio=2.6.0 opencv tqdm
+```
+
+Then, from the directory of this `README` file, execute the script `scripts/convert_scannet.sh` to bring the dataset in 
+the structure that is required by the dataloader:
+```bash
+./scripts/convert_scannet.py /path/to/ScanNet_orig /path/to/ScanNet
+```
+
+Then specify the ScanNet directory (`/path/to/ScanNet`) in the `paths.toml` file. 
+The directory `/path/to/ScanNet_orig` can be deleted. The virtual environment `scannetreader` can be deleted.
+
+### Tanks and Temples
+From the directory of this `README` file, execute the script `scripts/download_tanks_and_temples.sh` and specify the 
+download target directory to download the dataset:
+```bash
+./scripts/download_tanks_and_temples.sh /path/to/tanks_and_temples
+```
+Then specify the download directory (`/path/to/tanks_and_temples`) in the `paths.toml` file.
 
 ## Data format
 Depending on the dataset type, the data is provided in a specific format. 
@@ -208,7 +239,16 @@ dataloader = dataset.get_loader(batch_size=4, shuffle=False, num_workers=2, coll
 #### `robustmvd` split
 This is the split introduced in "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al. It is based
 on the training split of the ETH3D High-res multi-view data, which consists of 13 sequences with in total 454 views.
-For the `robustmvd` split, samples are defined based on 8 views of each sequence, resulting in a total of 104 samples.
+For the `robustmvd` split, samples are defined based on 8 keyview from each sequence, resulting in a total of 104 
+samples.
+
+##### Source views:
+Each  sample  contains  10  source  views,  using  the view  selection  provided  by
+<https://github.com/FangjinhuaWang/PatchmatchNet>.
+
+##### Depth range:
+A depth range is not available. Instead, the minimum and maximum value of the ground truth depth maps are used as 
+depth range.
 
 ### KITTI
 #### `robustmvd` split
@@ -217,3 +257,67 @@ It is based on the commonly used Eigen test split, which contains 697 samples. I
 split where dense ground truth depth from Uhrig et al. is available (652 samples), and where ground truth poses
 from the KITTI odometry benchmark are available (95 samples). It uses only samples where 10 views before
 and 10 views after are available. This additional restriction leads to the final split with 93 samples.
+
+##### Source views:
+10 views before and 10 views after the keyview are uses as source views.
+
+##### Depth range:
+A depth range is not available. Instead, the minimum and maximum value of the ground truth depth maps are used as 
+depth range.
+
+### DTU
+#### `robustmvd` split
+This is the split introduced in "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al. 
+It is based on the evaluation split used in MVSNet, which comprises 22 scans, where each scan has 49 frames. 
+For the `robustmvd` split, 5 views of each scan are used as keyviews, resulting in a total of 110 samples.  
+
+##### Source views:
+Each sample contains 10 source views, using the view selection provided by 
+<https://github.com/YoYo000/MVSNet>. 
+
+##### Ground truth depth maps and depth ranges:
+As ground truth depth, the depth maps from <https://github.com/YoYo000/MVSNet> are used. 
+As ground truth depth range, the range 0.425m to 0.935m is used, which is common in many MVSNet-based works.
+
+### ScanNet
+#### `robustmvd` split
+This is the split introduced in "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al. 
+It is based on the split from DeepV2D, which in turn extends the split by BA-Net and 
+consists of 2000 samples taken from 90 of the 1513 totally available sequences. 
+For the `robustmvd` split, every 10th sample of the original split is used, resulting in a total of 200 samples. 
+
+##### Source views:
+3 views before and 4 views after the keyview are uses as source views.
+
+##### Depth range:
+A depth range is not available. Instead, the minimum and maximum value of the ground truth depth maps are used as 
+depth range.
+
+##### Misc:
+Images are resized to a resolution of 640x480px to match ground truth depth maps.
+
+### Tanks and Temples
+#### `robustmvd` split
+This is the split introduced in "A Benchmark and a Baseline for Robust Depth Estimation" by Schröppel et al. 
+It is based on the scenes "Barn", "Courthouse", "Church", and "Ignatius" from the original training split.
+Other scenes from the training split were not used, as they were not available for download at the time of writing. 
+To speed up evaluation, only few images per scene are used as keyviews for the `robustmvd` split
+(Barn: 18; Church: 25; Couthouse: 13; Ignatius: 13), resulting in a total of 69 samples. 
+
+##### Camera poses and intrinsics
+The construction of the test set starts with the provided image sets of the respective scenes. 
+Camera poses and intrinsics are reconstructed by running COLMAP on the images. 
+The reconstructed camera poses are aligned with the ground truth using the Tanks and Temples evaluation script 
+<https://github.com/isl-org/TanksAndTemples/tree/master/python_toolbox/evaluation>. 
+
+##### Ground truth depth maps and depth ranges:
+To obtain ground truth depth maps for each image, the provided ground truth pointclouds for each scene are projected 
+into the images and filtered manually for outliers. 
+To determine the minimum depth range value, the minimum of the depth map and the visible 3d points estimated by COLMAP, 
+is used.
+To determine the maximum depth range value, the maximum of the depth map and the visible 3d points estimated by COLMAP, 
+is used.
+
+##### Source views:
+10 source views are used, which are selected with the view selection script from
+<https://github.com/FangjinhuaWang/PatchmatchNet/blob/main/colmap_input.py>.

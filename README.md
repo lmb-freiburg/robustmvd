@@ -52,6 +52,14 @@ On DTU:
 ```bash
 python eval.py --model robust_mvd --dataset dtu --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 896 1216
 ```
+On ScanNet:
+```bash
+python eval.py --model robust_mvd --dataset scannet --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 448 640
+```
+On Tanks and Temples:
+```bash
+python eval.py --model robust_mvd --dataset tanks_and_temples --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 704 1280
+```
 
 The parameters `model`, `dataset` and `eval_type` are required. 
 
@@ -64,8 +72,7 @@ It is also possible to run the evaluation from python code, for example with:
 import rmvd
 model = rmvd.create_model("robust_mvd", num_gpus=1)  # call with num_gpus=0 for CPU usage
 eval = rmvd.create_evaluation(evaluation_type="mvd", out_dir="/tmp/eval_output", inputs=["intrinsics", "poses"])
-dataset = rmvd.create_dataset("eth3d", "mvd", input_size=(384, 576))
-# alternative: dataset = rmvd.create_dataset("kitti", "mvd", input_size=(384, 1280))
+dataset = rmvd.create_dataset("kitti", "mvd", input_size=(384, 1280))
 results = eval(dataset=dataset, model=model)
 ```
 
@@ -99,7 +106,7 @@ Within this package, we use the following conventions:
 - all evaluations use numpy arrays as input and outputs
 - all evaluations use a batch size of 1 for consistent runtime measurements
 - GT depth values / inverse depth values of <=0 indicate invalid values
-- predicted depth / inverse depth values of ==0 indiacte invalid values
+- predicted depth / inverse depth values of ==0 indicate invalid values
 
 ## Robust Multi-view Depth Benchmark
 
@@ -126,7 +133,7 @@ The following describes how to evaluate on the benchmark.
 ### Evaluation of models within the `rmvd` framework
 Evaluation on the benchmark is done with the script `eval.py`:
 ```bash
-python eval.py --model robust_mvd --eval_type robustmvd --input poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216
+python eval.py --model robust_mvd --eval_type robustmvd --input poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216 --scannet_size 448 640 --tanks_and_temples_size 704 1280
 ```
 
 ### Programmatic evaluation
@@ -136,7 +143,7 @@ It is also possible to run evaluation on the benchmark from python code, for exa
 import rmvd
 model = rmvd.create_model("robust_mvd", num_gpus=1)  # call with num_gpus=0 for CPU usage
 eval = rmvd.create_evaluation(evaluation_type="robustmvd", out_dir="/tmp/eval_benchmark", inputs=["intrinsics", "poses"])
-results = eval(model=model, eth3d_size=(768, 1152), kitti_size=(384, 1280))
+results = eval(model=model, eth3d_size=(768, 1152), kitti_size=(384, 1280), dtu_size=(896, 1216), scannet_size=(448, 640), tanks_and_temples_size=(704, 1280))
 ```
 
 ### Evaluation of custom models
@@ -153,9 +160,10 @@ These functions are basically used to convert data between the formats of the `r
 format and to call the model. For details about these functions, see [rmvd/models/README.md](rmvd/models/README.md).
 
 ## TODOs
-- [ ] add all models that were evaluated in the publication to the `rmvd` framework
-- [ ] add more datasets: ScanNet, Tanks and Temples
+- [ ] add models that were evaluated in the publication to the `rmvd` framework
+- [ ] add code to gather and visualize benchmark results
 - [ ] add project page including an overview of the benchmark and a leaderboard
+- [ ] improve Tanks and Temples GT Depth
 - [ ] add code to train the models
 
 ## Changelog

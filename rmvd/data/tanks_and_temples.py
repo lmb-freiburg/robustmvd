@@ -7,66 +7,59 @@ from .dataset import Dataset, Sample
 from .registry import register_dataset, register_default_dataset
 
 
-class KITTIImage:
+class TanksAndTemplesImage:
     def __init__(self, path):
         self.path = path
 
     def load(self, root):
         path = osp.join(root, self.path)
-        image = np.array(Image.open(path).convert('RGB'), dtype=np.float32).transpose(2, 0, 1)
-        return image
+        img = np.array(Image.open(path), dtype=np.float32).transpose(2, 0, 1)
+        return img
 
 
-class KITTIDepth:
+class TanksAndTemplesDepth:
     def __init__(self, path):
         self.path = path
 
     def load(self, root):
         path = osp.join(root, self.path)
-
-        depth_png = np.array(Image.open(path), dtype=int)
-        # make sure we have a proper 16bit depth map here.. not 8bit!
-        assert (np.max(depth_png) > 255)
-
-        depth = depth_png.astype(np.float) / 256.
-        depth[depth_png == 0] = np.NaN
-
-        depth = depth.astype(np.float32)
+        depth = np.load(path)["arr_0"]
         depth = np.nan_to_num(depth, posinf=0., neginf=0., nan=0.)
         depth = np.expand_dims(depth, 0)  # 1HW
-
         return depth
 
 
-class KITTISample(Sample):
+class TanksAndTemplesSample(Sample):
 
-    def __init__(self, name):
+    def __init__(self, name, base):
         self.name = name
+        self.base = base
         self.data = {}
 
     def load(self, root):
 
-        out_dict = {'_base': root, '_name': self.name}
+        base = osp.join(root, self.base)
+        out_dict = {'_base': base, '_name': self.name}
 
         for key, val in self.data.items():
             if not isinstance(val, list):
                 if getattr(val, "load", False):
-                    out_dict[key] = val.load(root)
+                    out_dict[key] = val.load(base)
                 else:
                     out_dict[key] = val
             else:
-                out_dict[key] = [ele if isinstance(ele, np.ndarray) else ele.load(root) for ele in val]
+                out_dict[key] = [ele if isinstance(ele, np.ndarray) else ele.load(base) for ele in val]
 
         return out_dict
 
 
 @register_default_dataset
-class KITTIRobustMVD(Dataset):
+class TanksAndTemplesTrainRobustMVD(Dataset):
 
-    base_dataset = 'kitti'
+    base_dataset = 'tanks_and_temples'
     split = 'robustmvd'
     dataset_type = 'mvd'
 
     def __init__(self, root=None, **kwargs):
-        root = root if root is not None else self._get_path("kitti", "root")
+        root = root if root is not None else self._get_path("tanks_and_temples", "root")
         super().__init__(root=root, **kwargs)
