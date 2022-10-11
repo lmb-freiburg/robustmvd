@@ -309,7 +309,7 @@ class MultiViewDepthEvaluation:
                         'pred_depth': pred_depth,
                         'pred_invdepth': pred_invdepth}
 
-        if self.eval_uncertainty:
+        if 'depth_uncertainty' in pred:
             qualitatives['pred_depth_uncertainty'] = pred['depth_uncertainty'][0]
 
         return qualitatives
@@ -556,6 +556,10 @@ class MultiViewDepthEvaluation:
             print(results)
 
         if self.out_dir is not None:
+
+            if self.verbose:
+                print(f"Writing results to {self.out_dir}.")
+
             results_per_sample.to_pickle(osp.join(self.sample_results_dir, "results.pickle"))
             results_per_sample.to_csv(osp.join(self.sample_results_dir, "results.csv"))
             results.to_pickle(osp.join(self.quantitatives_dir, "results.pickle"))

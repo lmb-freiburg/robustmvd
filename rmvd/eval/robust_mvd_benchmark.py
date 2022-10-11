@@ -3,9 +3,11 @@ import os.path as osp
 from typing import Optional, Sequence, Tuple, Union
 
 import torch
+import pandas as pd
 
 from .multi_view_depth_evaluation import MultiViewDepthEvaluation
 from rmvd import create_dataset
+from rmvd.utils import prepend_level
 
 
 class RobustMultiViewDepthBenchmark:
@@ -121,12 +123,16 @@ class RobustMultiViewDepthBenchmark:
         if self.out_dir is not None:
             model_dir = osp.join(self.out_dir, model.name)
             os.makedirs(model_dir, exist_ok=True)
+        else:
+            model_dir = None
 
         datasets = [("kitti.robustmvd.mvd", kitti_size),
                     ("dtu.robustmvd.mvd", dtu_size),
                     ("scannet.robustmvd.mvd", scannet_size),
                     ("tanks_and_temples.robustmvd.mvd", tanks_and_temples_size),
                     ("eth3d.robustmvd.mvd", eth3d_size),]
+
+        results = []
 
         for dataset_name, input_size in datasets:
             print(f"Running evaluation on {dataset_name}.")
@@ -141,8 +147,33 @@ class RobustMultiViewDepthBenchmark:
                                             view_ordering="quasi-optimal", max_source_views=self.max_source_views,
                                             eval_uncertainty=self.eval_uncertainty, clip_pred_depth=True,
                                             sparse_pred=self.sparse_pred, verbose=self.verbose)
+            # TODO: pass tqdm progress bar and set verbose to False
 
             dataset = create_dataset(dataset_name=dataset_name, dataset_type="mvd", input_size=input_size)
-            eval(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives, burn_in_samples=3)
+            result = eval(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives, burn_in_samples=3)
+            result = prepend_level(result, "dataset", dataset_name, axis=1)
+            results.append(result)
             print()
-        # TODO: add return value
+
+        results = pd.concat(results, axis=1)
+        self._output_results(results, model_dir)
+        return results
+
+    def _output_results(self, results, out_dir):
+        num_source_view_results = results.drop('best', axis=1, level=1).mean()
+        results = results.loc[:, (slice(None), 'best')].droplevel(level=1, axis=1).mean()
+
+        if self.verbose:
+            print()
+            print("Robust MVD Benchmark Results:")
+            print(results)
+
+        if out_dir is not None:
+
+            if self.verbose:
+                print(f"Writing Robust MVD Benchmark results to {out_dir}.")
+
+            results.to_csv(osp.join(out_dir, "results.csv"))
+            results.to_pickle(osp.join(out_dir, "results.pickle"))
+            num_source_view_results.to_csv(osp.join(out_dir, "num_source_view_results.csv"))
+            num_source_view_results.to_pickle(osp.join(out_dir, "num_source_view_results.pickle"))
