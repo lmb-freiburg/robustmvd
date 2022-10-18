@@ -25,7 +25,7 @@ target directory to download the dataset:
 ```bash
 ./scripts/download_eth3d.sh /path/to/eth3d
 ```
-Then specify the download directory (`/path/to/eth3d`) in the `paths.toml` file.
+Then specify the download directory `/path/to/eth3d` in the `paths.toml` file.
 
 ### KITTI
 Download the KITTI raw data from <https://www.cvlibs.net/datasets/kitti/raw_data.php> using

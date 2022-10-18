@@ -42,23 +42,23 @@ The setup and interface of the models is explained in [rmvd/models/README.md](rm
 ### Evaluation script
 Evaluation is done with the script `eval.py`, for example on ETH3D:
 ```bash
-python eval.py --model robust_mvd --dataset eth3d --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 768 1152 
+python eval.py --model robust_mvd --dataset eth3d --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 768 1152 
 ```
 On KITTI:
 ```bash
-python eval.py --model robust_mvd --dataset kitti --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 384 1280
+python eval.py --model robust_mvd --dataset kitti --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 384 1280
 ```
 On DTU:
 ```bash
-python eval.py --model robust_mvd --dataset dtu --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 896 1216
+python eval.py --model robust_mvd --dataset dtu --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 896 1216
 ```
 On ScanNet:
 ```bash
-python eval.py --model robust_mvd --dataset scannet --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 448 640
+python eval.py --model robust_mvd --dataset scannet --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 448 640
 ```
 On Tanks and Temples:
 ```bash
-python eval.py --model robust_mvd --dataset tanks_and_temples --eval_type mvd --input poses intrinsics --output /tmp/eval_output --input_size 704 1280
+python eval.py --model robust_mvd --dataset tanks_and_temples --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 704 1280
 ```
 
 The parameters `model`, `dataset` and `eval_type` are required. 
@@ -133,7 +133,7 @@ The following describes how to evaluate on the benchmark.
 ### Evaluation of models within the `rmvd` framework
 Evaluation on the benchmark is done with the script `eval.py`:
 ```bash
-python eval.py --model robust_mvd --eval_type robustmvd --input poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216 --scannet_size 448 640 --tanks_and_temples_size 704 1280
+python eval.py --model robust_mvd --eval_type robustmvd --inputs poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216 --scannet_size 448 640 --tanks_and_temples_size 704 1280
 ```
 
 ### Programmatic evaluation
@@ -171,9 +171,9 @@ format and to call the model. For details about these functions, see [rmvd/model
 
 ## Citation
 This is the official repository for the publication:
-> **A Benchmark and a Baseline for Robust Multi-view Depth Estimation**
+> **[A Benchmark and a Baseline for Robust Multi-view Depth Estimation](http://arxiv.org/abs/2209.06681)**
 >
-> [Philipp Schröppel](https://lmb.informatik.uni-freiburg.de/people/schroepp), [Jan Bechtold](https://lmb.informatik.uni-freiburg.de/people/bechtolj), [Artemij Amiranashvili](https://lmb.informatik.uni-freiburg.de/people/amiranas) and [Thomas Brox](https://lmb.informatik.uni-freiburg.de/people/brox)
+> [Philipp Schröppel](https://lmb.informatik.uni-freiburg.de/people/schroepp), [Jan Bechtold](https://lmb.informatik.uni-freiburg.de/people/bechtolj), [Artemij Amiranashvili](https://lmb.informatik.uni-freiburg.de/people/amiranas), [Thomas Brox](https://lmb.informatik.uni-freiburg.de/people/brox)
 > 
 > **3DV 2022**
 

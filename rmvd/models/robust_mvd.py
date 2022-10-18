@@ -19,7 +19,6 @@ from rmvd.data.transforms import Resize
 
 class RobustMVD(nn.Module):
     def __init__(self):
-
         super().__init__()
 
         self.encoder = DispnetEncoder()

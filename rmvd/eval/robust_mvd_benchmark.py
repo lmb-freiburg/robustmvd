@@ -32,8 +32,10 @@ class RobustMultiViewDepthBenchmark:
             None evaluates predictions without any alignment.
             "median" scales predicted depth maps with the ratio of medians of predicted and ground truth depth maps.
             "translation" scales predicted depth maps with the ratio of the predicted and ground truth translation.
-        max_source_views: Maximum number of source views to be considered in case view_ordering is
-            "quasi-optimal" or "nearest". None means all available source views are considered.
+        max_source_views: Maximum number of source views to be considered. None means all available source views are
+            considered. Default: None.
+        min_source_views. Minimum number of source views provided to the model.
+            If max_source_views is not None, is set to min(min_source_views, max_source_views). Default: 1.
         eval_uncertainty: Evaluate predicted uncertainty (pred_depth_uncertainty) if available.
             Increases evaluation time.
         sparse_pred: Predicted depth is sparse. Invalid predictions are indicated by 0 values and ignored in
@@ -45,9 +47,11 @@ class RobustMultiViewDepthBenchmark:
                  inputs: Sequence[str] = None,
                  alignment: Optional[str] = None,
                  max_source_views: Optional[int] = None,
+                 min_source_views: int = 1,
                  eval_uncertainty: bool = True,
                  sparse_pred: bool = False,
                  verbose: bool = True,
+                 **_
                  ):
 
         self.verbose = verbose
@@ -59,9 +63,10 @@ class RobustMultiViewDepthBenchmark:
         if self.out_dir is not None:
             os.makedirs(self.out_dir, exist_ok=True)
 
-        self.inputs = inputs
+        self.inputs = list(set(inputs + ["images"])) if inputs is not None else ["images"]
         self.alignment = alignment
         self.max_source_views = max_source_views
+        self.min_source_views = min_source_views if max_source_views is None else min(min_source_views, max_source_views)
         self.eval_uncertainty = eval_uncertainty
         self.sparse_pred = sparse_pred
 
@@ -79,6 +84,7 @@ class RobustMultiViewDepthBenchmark:
         ret += f"\n\tInputs: {self.inputs}"
         ret += f"\n\tAlignment: {self.alignment}"
         ret += f"\n\tMax source views: {self.max_source_views}"
+        ret += f"\n\tMin source views: {self.min_source_views}"
         ret += f"\n\tEvaluate uncertainty: {self.eval_uncertainty}"
         ret += f"\n\tPredicted depth is sparse: {self.sparse_pred}"
         if self.out_dir is not None:
@@ -145,6 +151,7 @@ class RobustMultiViewDepthBenchmark:
 
             eval = MultiViewDepthEvaluation(out_dir=out_dir, inputs=self.inputs, alignment=self.alignment,
                                             view_ordering="quasi-optimal", max_source_views=self.max_source_views,
+                                            min_source_views=self.min_source_views,
                                             eval_uncertainty=self.eval_uncertainty, clip_pred_depth=True,
                                             sparse_pred=self.sparse_pred, verbose=self.verbose)
             # TODO: pass tqdm progress bar and set verbose to False

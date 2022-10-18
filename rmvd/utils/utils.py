@@ -5,6 +5,7 @@ import re
 import numpy as np
 import torch
 from torch._six import string_classes
+import pytoml
 
 
 def get_function(name):  # from https://github.com/aschampion/diluvian/blob/master/diluvian/util.py
@@ -243,8 +244,10 @@ def select_by_index(l, idx):
         for batch_idx, idx in enumerate(indices):
             ret.append(l[idx][batch_idx])
 
-        ret = torch.stack(ret, 0)
-        # TODO: l might be a list of other data than just torch.Tensor or np arrays
+        if isinstance(ret[0], np.ndarray):
+            ret = np.stack(ret, 0)
+        else:
+            ret = torch.stack(ret, 0)
 
     return ret
 
@@ -266,7 +269,28 @@ def exclude_index(l, exclude_idx):
             ret.append([ele[batch_idx] for idx, ele in enumerate(l) if idx != exclude_idx])
 
         transposed = list(zip(*ret))
-        ret = [torch.stack(ele, 0) for ele in transposed]
-        # TODO: l might be a list of other data than just torch.Tensor or np arrays
+        if isinstance(transposed[0][0], np.ndarray):
+            ret = [np.stack(ele, 0) for ele in transposed]
+        else:
+            ret = [torch.stack(ele, 0) for ele in transposed]
 
     return ret
+
+
+def get_paths(paths_file):
+    with open(paths_file, 'r') as paths_file:
+        return pytoml.load(paths_file)
+
+
+def get_path(paths_file, *keys):
+    paths = get_paths(paths_file)
+    path = None
+
+    for idx, key in enumerate(keys):
+        if key in paths:
+            if key in paths and (isinstance(paths[key], str) or isinstance(paths[key], list)) and idx == len(keys) - 1:
+                path = paths[key]
+            else:
+                paths = paths[key]
+
+    return path

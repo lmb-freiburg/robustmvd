@@ -32,8 +32,9 @@ class Resize:
         sample["images"] = images
         
         # resize intrinsics:
-        scale_arr = np.array([[wd / orig_wd]*3, [ht / orig_ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
-        sample["intrinsics"] = [intrinsic * scale_arr for intrinsic in sample["intrinsics"]]
+        if "intrinsics" in sample:
+            scale_arr = np.array([[wd / orig_wd]*3, [ht / orig_ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
+            sample["intrinsics"] = [intrinsic * scale_arr for intrinsic in sample["intrinsics"]]
 
         sample["orig_width"] = orig_wd
         sample["orig_height"] = orig_ht

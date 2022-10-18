@@ -14,9 +14,6 @@ from rmvd.utils import numpy_collate, vis
 from .metrics import m_rel_ae, pointwise_rel_ae, thresh_inliers, sparsification
 
 
-# TODO: add tensorboard logging
-
-
 class MultiViewDepthEvaluation:
     """Multi-view depth evaluation.
 
@@ -30,6 +27,9 @@ class MultiViewDepthEvaluation:
     A typical depth-from-video model would set
         inputs=["images", "intrinsics"], alignment="median".
 
+    A typical depth-from-single-view model would set
+        inputs=["images"], max_source_views=0, alignment="median".
+
     Args:
         out_dir: Directory where results will be written. If None, results are not written to disk.
         inputs: List of input modalities that are supplied to the algorithm.
@@ -39,9 +39,12 @@ class MultiViewDepthEvaluation:
             None evaluates predictions without any alignment.
             "median" scales predicted depth maps with the ratio of medians of predicted and ground truth depth maps.
             "translation" scales predicted depth maps with the ratio of the predicted and ground truth translation.
+        max_source_views: Maximum number of source views to be considered. None means all available source views are
+            considered. Default: None.
+        min_source_views. Minimum number of source views provided to the model.
+            If max_source_views is not None, is set to min(min_source_views, max_source_views). Default: 1.
         view_ordering: Ordering of source views during the evaluation.
-            Options are "quasi-optimal", "nearest" and None. Default: "quasi-optimal".
-            None: supply all source views to the model and evaluate predicted depth map.
+            Options are "quasi-optimal" and "nearest". Default: "quasi-optimal".
             "quasi-optimal": evaluate predicted depth maps for all (keyview, sourceview) pairs.
                 Order source views according to the prediction accuracy. Increase source view set based on
                 the obtained ordering and re-evaluate for each additional source view.
@@ -50,8 +53,6 @@ class MultiViewDepthEvaluation:
                 view set based on the ordering of views in the sample, i.e. based on the distance between source
                 view indices and the keyview index. Log results based on the number of source views.
                 Log best results as overall results.
-        max_source_views: Maximum number of source views to be considered in case view_ordering is
-            "quasi-optimal" or "nearest". None means all available source views are considered.
         eval_uncertainty: Evaluate predicted uncertainty (pred_depth_uncertainty) if available.
             Increases evaluation time.
         clip_pred_depth: Clip model predictions before evaluation to a reasonable range. This makes sense to reduce
@@ -64,12 +65,14 @@ class MultiViewDepthEvaluation:
                  out_dir: Optional[str] = None,
                  inputs: Sequence[str] = None,
                  alignment: Optional[str] = None,
-                 view_ordering: str = "quasi-optimal",
                  max_source_views: Optional[int] = None,
+                 min_source_views: int = 1,
+                 view_ordering: str = "quasi-optimal",
                  eval_uncertainty: bool = True,
                  clip_pred_depth: Union[bool, Tuple[float, float]] = True,
                  sparse_pred: bool = False,
                  verbose: bool = True,
+                 **_
                  ):
 
         self.verbose = verbose
@@ -89,8 +92,9 @@ class MultiViewDepthEvaluation:
 
         self.inputs = list(set(inputs + ["images"])) if inputs is not None else ["images"]
         self.alignment = alignment
-        self.view_ordering = view_ordering
         self.max_source_views = max_source_views
+        self.min_source_views = min_source_views if max_source_views is None else min(min_source_views, max_source_views)
+        self.view_ordering = view_ordering if (self.max_source_views is None) or (self.max_source_views > 0) else None
         self.eval_uncertainty = eval_uncertainty
         self.clip_pred_depth = clip_pred_depth
         self.sparse_pred = sparse_pred
@@ -120,8 +124,9 @@ class MultiViewDepthEvaluation:
         ret = f"{self.name} with settings:"
         ret += f"\n\tInputs: {self.inputs}"
         ret += f"\n\tAlignment: {self.alignment}"
-        ret += f"\n\tView ordering: {self.view_ordering}"
+        ret += f"\n\tMin source views: {self.min_source_views}"
         ret += f"\n\tMax source views: {self.max_source_views}"
+        ret += f"\n\tView ordering: {self.view_ordering}"
         ret += f"\n\tEvaluate uncertainty: {self.eval_uncertainty}"
         ret += f"\n\tClip predicted depth: {self.clip_pred_depth}"
         ret += f"\n\tPredicted depth is sparse: {self.sparse_pred}"
@@ -222,7 +227,7 @@ class MultiViewDepthEvaluation:
             ordered_source_indices = self._get_source_view_ordering(sample_inputs=sample_inputs, sample_gt=sample_gt)
             max_source_views = min(len(ordered_source_indices), self.max_source_views) \
                 if self.max_source_views is not None else len(ordered_source_indices)
-            min_source_views = 1 if self.view_ordering is not None else max_source_views
+            min_source_views = self.min_source_views
 
             best_metrics = None
             best_num_source_views = np.nan
@@ -234,7 +239,7 @@ class MultiViewDepthEvaluation:
                 cur_keyview_idx = cur_view_indices.index(keyview_idx)
 
                 if self.verbose:
-                    print(f"\tEvaluating with {num_source_views} / {len(ordered_source_indices)} source views:")
+                    print(f"\tEvaluating with {num_source_views} / {max_source_views} source views:")
                     print(f"\t\tSource view indices: {cur_source_indices}.")
 
                 self._reset_memory_stats()
@@ -371,7 +376,7 @@ class MultiViewDepthEvaluation:
     def _get_source_view_ordering(self, sample_inputs, sample_gt):
         if self.view_ordering == 'quasi-optimal':
             return self._get_quasi_optimal_source_view_ordering(sample_inputs=sample_inputs, sample_gt=sample_gt)
-        else:
+        elif (self.view_ordering == 'nearest') or (self.view_ordering is None):
             return self._get_nearest_source_view_ordering(sample_inputs=sample_inputs, sample_gt=sample_gt)
 
     def _get_nearest_source_view_ordering(self, sample_inputs, sample_gt):
@@ -389,13 +394,17 @@ class MultiViewDepthEvaluation:
             # construct temporary sample with a single source view:
             cur_sample_inputs = deepcopy(sample_inputs)
             cur_sample_gt = deepcopy(sample_gt)
-            cur_sample_inputs['images'] = [cur_sample_inputs['images'][keyview_idx],
-                                           cur_sample_inputs['images'][source_idx]]
-            cur_sample_inputs['poses'] = [cur_sample_inputs['poses'][keyview_idx],
-                                          cur_sample_inputs['poses'][source_idx]]
-            cur_sample_inputs['intrinsics'] = [cur_sample_inputs['intrinsics'][keyview_idx],
-                                               cur_sample_inputs['intrinsics'][source_idx]]
+            if "images" in self.inputs:
+                cur_sample_inputs['images'] = [cur_sample_inputs['images'][keyview_idx],
+                                               cur_sample_inputs['images'][source_idx]]
+            if "poses" in self.inputs:
+                cur_sample_inputs['poses'] = [cur_sample_inputs['poses'][keyview_idx],
+                                              cur_sample_inputs['poses'][source_idx]]
+            if "intrinsics" in self.inputs:
+                cur_sample_inputs['intrinsics'] = [cur_sample_inputs['intrinsics'][keyview_idx],
+                                                   cur_sample_inputs['intrinsics'][source_idx]]
             cur_sample_inputs['keyview_idx'] = np.array([0])
+            # depth_range is not changed
 
             # run model:
             pred, _, _ = self._run_model(cur_sample_inputs)

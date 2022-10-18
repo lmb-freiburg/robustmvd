@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import sys
 import os.path as osp
@@ -36,6 +38,10 @@ def eval(args):
     eval = create_evaluation(evaluation_type=args.eval_type,
                              out_dir=args.output,
                              inputs=args.inputs,
+                             alignment=args.alignment,
+                             view_ordering=args.view_ordering,
+                             min_source_views=args.min_source_views,
+                             max_source_views=args.max_source_views,
                              eval_uncertainty=args.eval_uncertainty)
 
     with open(osp.join(args.output, "cmd.txt"), 'a') as f:
@@ -55,18 +61,28 @@ if __name__ == '__main__':
     parser.add_argument('--weights', help="Path to weights of the model. Optional. If None, default weights are used.")
     parser.add_argument('--num_gpus', type=int, help="Number of GPUs. 0 means use CPU. Default: use 1 GPU.", default=1)
     parser.add_argument('--eval_type', help=f"Evaluation setting. Options are: {', '.join(list_evaluations())}")
-    parser.add_argument('--input', nargs='*',
+    parser.add_argument('--inputs', nargs='*',
                         help=f"Model inputs. Images are always provided to the model. "
                              f"It is possible to specify multiple additional inputs, "
-                             f"e.g. --input intrinsics --input poses. "
+                             f"e.g. --inputs intrinsics poses. "
                              f"Options for additional model inputs are: intrinsics, poses, depth_range.",
-                        type=str, dest='inputs')
+                        type=str)
     parser.add_argument('--output', help="Path to folder for output data.")
 
     parser.add_argument('--num_samples', type=int, help='Number of samples to be evaluated. Default: evaluate all.')
     parser.add_argument('--samples', type=int, nargs='*',
                         help='Index of sample that should be evaluated. Ignored if num_samples is used. '
                              'Default: evaluate all.')
+
+    parser.add_argument('--max_source_views', type=int, help='Maximum number of source views to use for evaluation. '
+                                                             'Default: use all available source views.')
+    parser.add_argument('--min_source_views', type=int, default=1,
+                        help='Minimum number of source views to use for evaluation. Default: 1.')
+    parser.add_argument('--view_ordering', default="quasi-optimal",
+                        help=f"Source view ordering. Options are: quasi-optimal (default), nearest.")
+    parser.add_argument('--alignment',
+                        help=f"Alignment between predicted and ground truth depths. "
+                             f"Options are None, median, translation. Default: None")
 
     parser.add_argument('--num_qualitatives', type=int, default=10,
                         help='Number of qualitatives to be output. Negative values output all qualitatives. '
