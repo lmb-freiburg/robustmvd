@@ -7,11 +7,13 @@ Currently, the `rmvd` framework supports the following datasets:
 - ScanNet
 - Tanks and Temples
 
-Datasets can come in different types, depending on the structure of the provided data.
+Datasets can come in different formats regarding the structure of the provided data.
 Currently only one type is supported:
 - Multi-view depth (mvd): each sample contains multiple views and one view is assigned as keyview
 
 Some datasets have different splits, e.g. `train` and `test`, or some custom splits, e.g. the `Eigen` split of KITTI.
+
+---
 
 ## Setup
 All datasets need to be downloaded and some need to be preprocessed before they can be used. For some datasets, 
@@ -88,6 +90,8 @@ download target directory to download the dataset:
 ./scripts/download_tanks_and_temples.sh /path/to/tanks_and_temples
 ```
 Then specify the download directory (`/path/to/tanks_and_temples`) in the `paths.toml` file.
+
+---
 
 ## Data format
 Depending on the dataset type, the data is provided in a specific format. 
@@ -166,6 +170,8 @@ tensors and a batch dimension is prepended. A "batched" sample is a dictionary w
 All datasets can be used within a torch dataloader, which automatically converts the data as with `to_torch=True`. For
 details on using datasets within dataloaders, see below.
 
+---
+
 ## Usage
 
 ### Creating a dataset
@@ -232,6 +238,8 @@ from rmvd.utils import numpy_collate
 dataset = create_dataset("eth3d.mvd", input_size=(384, 576))
 dataloader = dataset.get_loader(batch_size=4, shuffle=False, num_workers=2, collate_fn=numpy_collate)
 ```
+
+---
 
 ## Dataset splits
 

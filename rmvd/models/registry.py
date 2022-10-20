@@ -17,7 +17,8 @@ def register_model(model_entrypoint):
 def list_models():  # TODO: add filter, e.g. to list all model variants
     """List all available models."""
     models = _model_entrypoints.keys()
-    return list(sorted(models))
+    models = list(sorted(models))
+    return models
 
 
 def has_model(name):
@@ -27,4 +28,5 @@ def has_model(name):
 
 def get_model(name):
     """Get model entrypoint by name."""
+    assert has_model(name), f'The requested model "{name}" does not exist. Available models are: {" ".join(list_models())}'
     return _model_entrypoints[name]

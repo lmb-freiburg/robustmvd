@@ -6,6 +6,8 @@ from multiple input views with a focus on robust application independent of the 
 This repository contains evaluation code for the Robust Multi-view Depth Benchmark. 
 Further, it contains implementations and weights of recent models together with inference scripts.
 
+![Image](teaser.png)
+
 In the following, we first describe the setup, structure, and usage of the `rmvd` framework. 
 Following this, we describe the usage of the Robust Multi-view Depth Benchmark. 
 

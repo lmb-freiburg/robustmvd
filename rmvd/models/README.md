@@ -53,6 +53,12 @@ this `README`)
 
 It is not necessary to install additional dependencies.
 
+#### Misc:
+The model is applied at a fixed input size of `width=1024` and `height=320`. It therefore does not make sense to load
+data at a specific downsampled resolution. Thus, don't use the `input_size` parameters of `Dataset` classes and of the
+`eval.py` and `inference.py` scripts, when using this model.
+
+
 ### `monodepth2_mono_stereo_640x192_wrapped`
 This is the "Monodepth2" model presented in the publication 
 "Digging into Self-Supervised Monocular Depth Estimation" by Godard et al. 
@@ -61,6 +67,11 @@ indicated as `mono+stereo_640x192`.
 
 #### Setup:
 Same as for the `monodepth2_mono_stereo_1024x320_wrapped` model.
+
+#### Misc:
+The model is applied at a fixed input size of `width=640` and `height=192`. It therefore does not make sense to load
+data at a specific downsampled resolution. Thus, don't use the `input_size` parameters of `Dataset` classes and of the
+`eval.py` and `inference.py` scripts, when using this model.
 
 ---
 
