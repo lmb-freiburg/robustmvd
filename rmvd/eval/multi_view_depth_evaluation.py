@@ -125,7 +125,7 @@ class MultiViewDepthEvaluation:
         ret += f"\n\tInputs: {self.inputs}"
         ret += f"\n\tAlignment: {self.alignment}"
         ret += f"\n\tMin source views: {self.min_source_views}"
-        ret += f"\n\tMax source views: {self.max_source_views}"
+        ret += f"\n\tMax source views: {'All' if self.max_source_views is None else self.max_source_views}"
         ret += f"\n\tView ordering: {self.view_ordering}"
         ret += f"\n\tEvaluate uncertainty: {self.eval_uncertainty}"
         ret += f"\n\tClip predicted depth: {self.clip_pred_depth}"

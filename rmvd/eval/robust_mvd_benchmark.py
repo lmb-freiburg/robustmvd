@@ -126,11 +126,6 @@ class RobustMultiViewDepthBenchmark:
         Returns:
             Results of the evaluation.
         """
-        if self.out_dir is not None:
-            model_dir = osp.join(self.out_dir, model.name)
-            os.makedirs(model_dir, exist_ok=True)
-        else:
-            model_dir = None
 
         datasets = [("kitti.robustmvd.mvd", kitti_size),
                     ("dtu.robustmvd.mvd", dtu_size),
@@ -144,7 +139,7 @@ class RobustMultiViewDepthBenchmark:
             print(f"Running evaluation on {dataset_name}.")
 
             if self.out_dir is not None:
-                out_dir = osp.join(model_dir, dataset_name)
+                out_dir = osp.join(self.out_dir, dataset_name)
                 os.makedirs(out_dir, exist_ok=True)
             else:
                 out_dir = None
@@ -163,7 +158,7 @@ class RobustMultiViewDepthBenchmark:
             print()
 
         results = pd.concat(results, axis=1)
-        self._output_results(results, model_dir)
+        self._output_results(results, self.out_dir)
         return results
 
     def _output_results(self, results, out_dir):

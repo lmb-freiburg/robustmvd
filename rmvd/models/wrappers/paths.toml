@@ -1,2 +1,5 @@
 [monodepth2]
     root = '/tmp/monodepth2/'
+
+[mvsnet_pl]
+    root = '/tmp/mvsnet_pl'

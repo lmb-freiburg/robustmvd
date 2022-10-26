@@ -15,7 +15,7 @@ These models can be used for training and inference/evaluation.
 Model wrappers around existing implementations. These models can only be used for inference/evaluation.
 Wrapped models are indicated by names that end with `_wrapped`.
 The setup of these models is usually a bit more involved, as it is required to download the original implementation
-(mostly cloning the respective repository on GitHub). Usually the setup requires the follwing steps:
+(e.g. cloning the respective repository from GitHub). Usually the setup requires the follwing steps:
 - clone the original repository to a local directory
 - specify the path to the local directory in the `wrappers/paths.toml` file
 - install required model-specific dependencies
@@ -49,7 +49,7 @@ directory to clone the original repository:
 ```
 
 Then specify the local directory `/path/to/monodepth2` in the `wrappers/paths.toml` file (relative to the directory of  
-this `README`)
+this `README`).
 
 It is not necessary to install additional dependencies.
 
@@ -72,6 +72,27 @@ Same as for the `monodepth2_mono_stereo_1024x320_wrapped` model.
 The model is applied at a fixed input size of `width=640` and `height=192`. It therefore does not make sense to load
 data at a specific downsampled resolution. Thus, don't use the `input_size` parameters of `Dataset` classes and of the
 `eval.py` and `inference.py` scripts, when using this model.
+
+### `mvsnet_pl`
+This is an unofficial implementation of the MVSNet model presented in the publication 
+"MVSNet: Depth Inference for Unstructured Multi-view Stereo" by Yao et al. 
+The model is wrapped around the unofficial implementation from <https://github.com/kwea123/MVSNet_pl>.
+
+#### Setup:
+From the directory of this `README` file, execute the script `scripts/setup_mvsnet_pl.sh` and specify the local
+directory to clone the original repository:
+```bash
+./scripts/setup_mvsnet_pl.sh /path/to/mvsnet_pl
+```
+
+Then specify the local directory `/path/to/mvsnet_pl` in the `wrappers/paths.toml` file (relative to the directory of  
+this `README`).
+
+It is required to install additional dependencies. You might want to set up a new virtual environment for this:
+```bash
+pip install git+https://github.com/mapillary/inplace_abn.git@v1.0.11
+pip install kornia
+```
 
 ---
 

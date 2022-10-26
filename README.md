@@ -133,9 +133,14 @@ Depth and uncertainty estimation performance is measured with the following metr
 The following describes how to evaluate on the benchmark.
 
 ### Evaluation of models within the `rmvd` framework
-Evaluation on the benchmark is done with the script `eval.py`:
+Evaluation on the benchmark is done with the script `eval.py`, e.g.:
 ```bash
 python eval.py --model robust_mvd --eval_type robustmvd --inputs poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216 --scannet_size 448 640 --tanks_and_temples_size 704 1280
+```
+
+The script `eval_all.sh` allows evaluation of all models in the `rmvd` framework on the benchmark:
+```bash
+./eval_all.sh -o /tmp/eval_benchmark
 ```
 
 ### Programmatic evaluation

@@ -46,6 +46,14 @@ def get_full_class_name(obj):
         return module + '.' + obj.__class__.__name__
 
 
+def trans_from_transform(T):
+    return T[0:3, 3]
+
+
+def rot_from_transform(T):
+    return T[0:3, 0:3]
+
+
 def transform_from_rot_trans(R, t):
     R = R.reshape(3, 3)
     t = t.reshape(3, 1)

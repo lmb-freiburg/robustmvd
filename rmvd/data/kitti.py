@@ -28,7 +28,7 @@ class KITTIDepth:
         # make sure we have a proper 16bit depth map here.. not 8bit!
         assert (np.max(depth_png) > 255)
 
-        depth = depth_png.astype(np.float) / 256.
+        depth = depth_png.astype(float) / 256.
         depth[depth_png == 0] = np.NaN
 
         depth = depth.astype(np.float32)
