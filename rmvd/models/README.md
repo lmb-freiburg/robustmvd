@@ -73,7 +73,7 @@ The model is applied at a fixed input size of `width=640` and `height=192`. It t
 data at a specific downsampled resolution. Thus, don't use the `input_size` parameters of `Dataset` classes and of the
 `eval.py` and `inference.py` scripts, when using this model.
 
-### `mvsnet_pl`
+### `mvsnet_pl_wrapped`
 This is an unofficial implementation of the MVSNet model presented in the publication 
 "MVSNet: Depth Inference for Unstructured Multi-view Stereo" by Yao et al. 
 The model is wrapped around the unofficial implementation from <https://github.com/kwea123/MVSNet_pl>.
@@ -93,6 +93,24 @@ It is required to install additional dependencies. You might want to set up a ne
 pip install git+https://github.com/mapillary/inplace_abn.git@v1.0.11
 pip install kornia
 ```
+
+### `midas_big_v2_1_wrapped`
+This is the "MiDaS" model presented in the publication 
+"Towards Robust Monocular Depth Estimation: Mixing Datasets for Zero-shot Cross-dataset Transfer" by Ranftl et al. 
+The model is wrapped around the original implementation from <https://github.com/isl-org/MiDaS>, where it is 
+indicated as `Big models: MiDaS v2.1`.
+
+#### Setup:
+From the directory of this `README` file, execute the script `scripts/setup_midas.sh` and specify the local
+directory to clone the original repository:
+```bash
+./scripts/setup_midas.sh /path/to/midas
+```
+
+Then specify the local directory `/path/to/midas` in the `wrappers/paths.toml` file (relative to the directory of  
+this `README`).
+
+It is not necessary to install additional dependencies.
 
 ---
 

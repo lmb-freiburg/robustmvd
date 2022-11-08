@@ -3,3 +3,6 @@
 
 [mvsnet_pl]
     root = '/tmp/mvsnet_pl'
+
+[midas]
+    root = '/tmp/midas'

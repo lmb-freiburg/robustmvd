@@ -446,9 +446,52 @@ class MultiViewDepthEvaluation:
             if mask.any() and np.isfinite(ratio):
                 pred_depth = pred_depth * ratio
             else:
-                ratio = 0
+                ratio = np.nan
 
             pred['scaling_factor'] = ratio
+
+        elif self.alignment == 'least_squares_scale_shift':
+            mask = gt_mask & pred_mask
+            with np.errstate(divide='ignore', invalid='ignore'):
+                pred_invdepth = np.nan_to_num(1 / pred_depth, nan=0, posinf=0, neginf=0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                gt_invdepth = np.nan_to_num(1 / gt_depth, nan=0, posinf=0, neginf=0)
+
+            if mask.any():
+                masked_gt_invdepth = (gt_invdepth[mask]).astype(np.float64)
+                masked_pred_invdepth = (pred_invdepth[mask]).astype(np.float64)
+
+                # system matrix: A = [[a_00, a_01], [a_10, a_11]]
+                a_00 = np.sum(masked_pred_invdepth * masked_pred_invdepth)
+                a_01 = np.sum(masked_pred_invdepth)
+                a_11 = np.sum(mask.astype(np.float64))
+
+                # right hand side: b = [b_0, b_1]
+                b_0 = np.sum(masked_gt_invdepth * masked_pred_invdepth)
+                b_1 = np.sum(masked_gt_invdepth)
+
+                det = a_00 * a_11 - a_01 * a_01
+                valid = det > 0
+
+                if valid:
+                    scale = ((a_11 * b_0 - a_01 * b_1) / det).astype(np.float32)
+                    shift = ((-a_01 * b_0 + a_00 * b_1) / det).astype(np.float32)
+                else:
+                    scale = np.nan
+                    shift = np.nan
+
+            else:
+                scale = np.nan
+                shift = np.nan
+
+            pred_invdepth = scale * pred_invdepth + shift
+            with np.errstate(divide='ignore', invalid='ignore'):
+                pred_depth = np.nan_to_num(1 / pred_invdepth, nan=0, posinf=0, neginf=0)
+            del pred_invdepth
+            del gt_invdepth
+            pred['least_squares_scale'] = scale
+            pred['least_squares_shift'] = shift
+
 
         if isinstance(self.clip_pred_depth, tuple):
             pred_depth = np.clip(pred_depth, self.clip_pred_depth[0], self.clip_pred_depth[1]) * pred_mask
@@ -508,8 +551,11 @@ class MultiViewDepthEvaluation:
         metrics = {'absrel': absrel, 'inliers103': inliers103,}
 
         if self.alignment == "median":
-            scale = pred['scaling_factor']
-            metrics['scaling_factor'] = scale if scale != 0 else np.nan
+            metrics['scaling_factor'] = pred['scaling_factor']
+
+        if self.alignment == "least_squares_scale_shift":
+            metrics['least_squares_scale'] = pred['least_squares_scale']
+            metrics['least_squares_shift'] = pred['least_squares_shift']
 
         metrics['pred_depth_density'] = np.sum(eval_mask) / eval_mask.size * 100
 
