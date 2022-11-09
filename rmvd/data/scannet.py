@@ -5,6 +5,7 @@ from PIL import Image
 
 from .dataset import Dataset, Sample
 from .registry import register_dataset, register_default_dataset
+from .layouts import MVDSequentialDefaultLayout, AllImagesLayout
 
 
 class ScanNetImage:
@@ -69,6 +70,13 @@ class ScanNetRobustMVD(Dataset):
     split = 'robustmvd'
     dataset_type = 'mvd'
 
-    def __init__(self, root=None, **kwargs):
+    def __init__(self, root=None, layouts=None, **kwargs):
         root = root if root is not None else self._get_path("scannet", "root")
-        super().__init__(root=root, **kwargs)
+
+        default_layouts = [
+            MVDSequentialDefaultLayout("default", num_views=8, keyview_idx=3),
+            AllImagesLayout("all_images", num_views=8),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)

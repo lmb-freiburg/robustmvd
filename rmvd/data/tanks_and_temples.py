@@ -5,6 +5,7 @@ from PIL import Image
 
 from .dataset import Dataset, Sample
 from .registry import register_dataset, register_default_dataset
+from .layouts import MVDUnstructuredDefaultLayout, AllImagesLayout
 
 
 class TanksAndTemplesImage:
@@ -60,6 +61,13 @@ class TanksAndTemplesTrainRobustMVD(Dataset):
     split = 'robustmvd'
     dataset_type = 'mvd'
 
-    def __init__(self, root=None, **kwargs):
+    def __init__(self, root=None, layouts=None, **kwargs):
         root = root if root is not None else self._get_path("tanks_and_temples", "root")
-        super().__init__(root=root, **kwargs)
+
+        default_layouts = [
+            MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),
+            AllImagesLayout("all_images", num_views=11),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)

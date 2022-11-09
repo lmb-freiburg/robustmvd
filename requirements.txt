@@ -8,3 +8,4 @@ pytoml
 tqdm
 opencv-python
 scikit-image
+pyqt5

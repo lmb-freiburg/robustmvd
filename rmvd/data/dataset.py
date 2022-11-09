@@ -21,7 +21,7 @@ class Sample(metaclass=abc.ABCMeta):
 
 class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
-    def __init__(self, root, aug_fcts=None, input_size=None, to_torch=False, verbose=True):
+    def __init__(self, root, aug_fcts=None, input_size=None, to_torch=False, layouts=None, verbose=True):
 
         aug_fcts = [] if aug_fcts is None else aug_fcts
         aug_fcts = [aug_fcts] if not isinstance(aug_fcts, list) else aug_fcts
@@ -41,6 +41,8 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
         self.samples = []
         self._init_samples()
+        self._layouts = {}
+        self._init_layouts(layouts)
 
         if self.verbose:
             print(f"\tNumber of samples: {len(self)}")
@@ -77,6 +79,21 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         print("\tInitializing samples from list at {}.".format(sample_list_path))
         with open(sample_list_path, 'rb') as sample_list:
             self.samples = pickle.load(sample_list)
+
+    def _init_layouts(self, layouts):
+        if layouts is not None:
+            for layout in layouts:
+                self.add_layout(layout)
+
+    def add_layout(self, layout):
+        self._layouts[layout.name.lower()] = layout
+
+    def get_layout_names(self):
+        return list(self._layouts.keys())
+
+    def get_layout(self, layout_name=None):
+        layout_name = layout_name if layout_name is not None else 'default'
+        return self._layouts[layout_name.lower()]
 
     def __len__(self):
         return len(self.samples)
