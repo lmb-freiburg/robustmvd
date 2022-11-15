@@ -178,16 +178,16 @@ details on using datasets within dataloaders, see below.
 To create a dataset, use the `create_dataset` function:
 ```python
 from rmvd import create_dataset
-dataset = create_dataset(dataset_name=dataset_name, dataset_type=dataset_type)  # optional: split, e.g. split='robustmvd'
+dataset = create_dataset(dataset_name_or_path=dataset_name, dataset_type=dataset_type)  # optional: split, e.g. split='robustmvd'
 
 # for example:
-dataset = create_dataset(dataset_name="eth3d", dataset_type="mvd")  # will create the default eth3d.mvd split, which is 'robustmvd'
+dataset = create_dataset(dataset_name_or_path="eth3d", dataset_type="mvd")  # will create the default eth3d.mvd split, which is 'robustmvd'
 # other options for creating exactly the same dataset:
-dataset = create_dataset(dataset_name="eth3d", dataset_type="mvd", split="robustmvd")  # explicitly specify the split
-dataset = create_dataset(dataset_name="eth3d.mvd")  # specify the dataset_type and/or split in the dataset_name param
-dataset = create_dataset(dataset_name="eth3d.robustmvd.mvd")
-dataset = create_dataset(dataset_name="eth3d.robustmvd", dataset_type="mvd")
-dataset = create_dataset(dataset_name="eth3d.mvd", split="robustmvd")
+dataset = create_dataset(dataset_name_or_path="eth3d", dataset_type="mvd", split="robustmvd")  # explicitly specify the split
+dataset = create_dataset(dataset_name_or_path="eth3d.mvd")  # specify the dataset_type and/or split in the dataset_name param
+dataset = create_dataset(dataset_name_or_path="eth3d.robustmvd.mvd")
+dataset = create_dataset(dataset_name_or_path="eth3d.robustmvd", dataset_type="mvd")
+dataset = create_dataset(dataset_name_or_path="eth3d.mvd", split="robustmvd")
 ```
 
 It is required to indicate a dataset name and a dataset type. The split can be specified with the optional 

@@ -7,7 +7,7 @@ def run_viewer(dataset, layout=None):
     app = QApplication(sys.argv)
 
     viewer_model = ViewerModel(dataset=dataset, layout=layout)
-    viewer = Viewer(model=viewer_model, title=dataset.name)
+    viewer = Viewer(model=viewer_model, title=dataset.full_name)
     viewer.showMaximized()
 
     app.exit(app.exec_())

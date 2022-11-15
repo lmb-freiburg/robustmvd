@@ -285,6 +285,28 @@ def exclude_index(l, exclude_idx):
     return ret
 
 
+def batched_index(l, eles):
+    """Gets the indices of a batch of elements in a list.
+
+    This is basically the equivalent of l.index(ele) in a batched version.
+
+    Args:
+        l (list): List with batched data items.
+        eles: Iterable that contains elemenets for each sample in the batch.
+    """
+    ret = []
+    for batch_idx, ele in enumerate(eles):
+        batch_l = [x[batch_idx] for x in l]
+        ret.append(batch_l.index(ele))
+
+    if isinstance(ret[0], np.ndarray):
+        ret = np.stack(ret, 0)
+    else:
+        ret = torch.stack(ret, 0)
+
+    return ret
+
+
 def get_paths(paths_file):
     with open(paths_file, 'r') as paths_file:
         return pytoml.load(paths_file)

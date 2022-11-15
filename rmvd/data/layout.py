@@ -1,3 +1,6 @@
+import dill as pickle
+
+
 def create_display_by_visualization_type(visualization_type, manager, label):
     visualization_type = visualization_type.lower()
 
@@ -45,11 +48,27 @@ class Layout:
 
         for visualization in self.visualizations:
             display_data = visualization.load_fct(data)
-
-            # TODO
-            # if visualization.name is not None and "label" not in display_data:
-            #     display_data["label"] = visualization.name
-
             display_datas.append(display_data)
 
         return display_datas
+
+    def write(self, path):
+        path = path + '.pickle' if not path.endswith('.pickle') else path
+        self.visualizations.append(self.name)  # TODO: refactor this
+
+        with open(path, 'wb') as file:
+            pickle.dump(self.visualizations, file)
+
+        self.visualizations = self.visualizations[:-1]
+
+    @classmethod
+    def from_file(cls, path, name=None):
+        path = path + '.pickle' if not path.endswith('.pickle') else path
+
+        with open(path, 'rb') as file:
+            visualizations = pickle.load(file)
+
+        name = name if name is not None else visualizations[-1]
+        visualizations = visualizations[:-1]
+
+        return cls(name=name, visualizations=visualizations)

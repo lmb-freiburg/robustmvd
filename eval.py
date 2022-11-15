@@ -27,7 +27,7 @@ def eval(args):
             return
 
         print(f"Evaluating {args.model} model on dataset {args.dataset} in the {args.eval_type} evaluation setting.\n")
-        dataset = create_dataset(dataset_name=args.dataset, dataset_type=args.eval_type,
+        dataset = create_dataset(dataset_name_or_path=args.dataset, dataset_type=args.eval_type,
                                  input_size=args.input_size)
 
     else:
@@ -52,7 +52,7 @@ def eval(args):
 
     eval(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives,
          eth3d_size=args.eth3d_size, kitti_size=args.kitti_size, dtu_size=args.dtu_size, scannet_size=args.scannet_size,
-         tanks_and_temples_size=args.tanks_and_temples_size)
+         tanks_and_temples_size=args.tanks_and_temples_size, exp_name=args.exp_name)
 
 
 if __name__ == '__main__':
@@ -68,6 +68,7 @@ if __name__ == '__main__':
                              f"Options for additional model inputs are: intrinsics, poses, depth_range.",
                         type=str)
     parser.add_argument('--output', help="Path to folder for output data.")
+    parser.add_argument('--exp_name', help="Experiment name. Optional.", type=str)
 
     parser.add_argument('--num_samples', type=int, help='Number of samples to be evaluated. Default: evaluate all.')
     parser.add_argument('--samples', type=int, nargs='*',

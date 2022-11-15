@@ -144,9 +144,12 @@ def _build_dataset_name(dataset_name, dataset_type=None, split=None, no_dataset_
 
 def has_dataset(dataset_name, dataset_type=None, split=None):
     """Check if dataset is registered."""
-    base_dataset, dataset_type, split = _split_dataset_name(dataset_name=dataset_name,
-                                                            dataset_type=dataset_type,
-                                                            split=split)
+    try:
+        base_dataset, dataset_type, split = _split_dataset_name(dataset_name=dataset_name,
+                                                                dataset_type=dataset_type,
+                                                                split=split)
+    except AssertionError:
+        return False
 
     return (base_dataset, dataset_type, split) in _datasets
 

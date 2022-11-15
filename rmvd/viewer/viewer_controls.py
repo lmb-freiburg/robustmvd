@@ -47,10 +47,14 @@ class ViewerControls(QWidget):
 
         if len(self._model.get_layout_names()) > 1:
             self._layout_nameDropdown = QComboBox()
-            self._layout_nameDropdown.currentIndexChanged.connect(self.current_layout_name_dropdown_changed)
             self._layout.addWidget(self._layout_nameDropdown, 0, 0, 1, 1)
-            for layout in self._model.get_layout_names():
+            for idx, layout in enumerate(self._model.get_layout_names()):
                 self._layout_nameDropdown.addItem(layout)
+                if layout == self._model.get_cur_layout_name():
+                    cur_layout_idx = idx
+
+            self._layout_nameDropdown.setCurrentIndex(cur_layout_idx)
+            self._layout_nameDropdown.currentIndexChanged.connect(self.current_layout_name_dropdown_changed)
 
         self._slider = IntSlider((0, 0))
         self._slider.value_changed.connect(self.set_index)

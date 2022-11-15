@@ -4,14 +4,17 @@ import time
 from copy import deepcopy
 from typing import Optional, Sequence, Tuple, Union
 import warnings
+import pickle
 
 import torch
 import skimage.transform
 import numpy as np
 import pandas as pd
 
-from rmvd.utils import numpy_collate, vis
+from rmvd.utils import numpy_collate, vis, select_by_index, get_full_class_name
+from rmvd.data.layout import Layout, Visualization
 from .metrics import m_rel_ae, pointwise_rel_ae, thresh_inliers, sparsification
+from rmvd.data.updates import Update
 
 
 class MultiViewDepthEvaluation:
@@ -103,6 +106,7 @@ class MultiViewDepthEvaluation:
         self.dataset = None
         self.dataloader = None
         self.model = None
+        self.exp_name = None
         self.sample_indices = None
         self.qualitative_indices = None
         self.burn_in_samples = None
@@ -110,6 +114,7 @@ class MultiViewDepthEvaluation:
         self.cur_sample_idx = 0
         self.results = None
         self.sparsification_curves = None
+        self.dataset_updates = None
 
         if self.verbose:
             print(self)
@@ -143,6 +148,7 @@ class MultiViewDepthEvaluation:
                  samples: Optional[Union[int, Sequence[int]]] = None,
                  qualitatives: Union[int, Sequence[int]] = 10,
                  burn_in_samples: int = 3,
+                 exp_name: Optional[str] = None,
                  **_):
         """Run depth evaluation for a dataset and model.
 
@@ -155,12 +161,13 @@ class MultiViewDepthEvaluation:
                 the indices of samples for which qualitatives should be logged. -1 logs qualitatives for all samples.
             burn_in_samples: Number of samples that will not be considered for runtime/memory measurements.
                 Defaults to 3.
+            exp_name: Name of the experiment. Optional.
 
         Returns:
             Results of the evaluation.
         """
         self._init_evaluation(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives,
-                              burn_in_samples=burn_in_samples)
+                              burn_in_samples=burn_in_samples, exp_name=exp_name)
         results = self._evaluate()
         self._output_results()
         self._reset_evaluation()
@@ -171,17 +178,18 @@ class MultiViewDepthEvaluation:
                          model,
                          samples=None,
                          qualitatives=10,
-                         burn_in_samples=3,):
+                         burn_in_samples=3,
+                         exp_name=None,):
         self.dataset = dataset
         self.model = model
+        self.exp_name = exp_name
         self._init_sample_indices(samples=samples)
         self._init_qualitative_indices(qualitatives=qualitatives)
         self._init_results()
         self.burn_in_samples = burn_in_samples
         self.dataloader = self.dataset.get_loader(batch_size=1, indices=self.sample_indices, num_workers=0,
                                                   collate_fn=numpy_collate)
-        # we intentionally fix a batch_size=1, to ensure comparable runtimes
-        # TODO: write artifacts, e.g. layout, ..
+        # we fix a batch_size=1 to ensure comparable runtimes
 
     def _init_sample_indices(self, samples):
         if isinstance(samples, list):
@@ -230,13 +238,11 @@ class MultiViewDepthEvaluation:
             min_source_views = self.min_source_views
 
             best_metrics = None
-            best_num_source_views = np.nan
             best_pred = None
 
             for num_source_views in range(min_source_views, max_source_views+1):
                 cur_source_indices = ordered_source_indices[:num_source_views]
                 cur_view_indices = list(sorted([keyview_idx] + cur_source_indices))
-                cur_keyview_idx = cur_view_indices.index(keyview_idx)
 
                 if self.verbose:
                     print(f"\tEvaluating with {num_source_views} / {max_source_views} source views:")
@@ -246,15 +252,7 @@ class MultiViewDepthEvaluation:
 
                 # construct current input sample:
                 cur_sample_gt = deepcopy(sample_gt)
-                cur_sample_inputs = deepcopy(sample_inputs)
-                if "images" in self.inputs:
-                    cur_sample_inputs['images'] = [cur_sample_inputs['images'][i] for i in cur_view_indices]
-                if "poses" in self.inputs:
-                    cur_sample_inputs['poses'] = [cur_sample_inputs['poses'][i] for i in cur_view_indices]
-                if "intrinsics" in self.inputs:
-                    cur_sample_inputs['intrinsics'] = [cur_sample_inputs['intrinsics'][i] for i in cur_view_indices]
-                cur_sample_inputs['keyview_idx'] = np.array([cur_keyview_idx])
-                # depth_range is not changed
+                cur_sample_inputs = filter_views_in_sample(sample=sample_inputs, indices_to_keep=cur_view_indices)
 
                 # run model:
                 pred, runtimes, gpu_mem = self._run_model(cur_sample_inputs)
@@ -274,29 +272,29 @@ class MultiViewDepthEvaluation:
                 if np.isfinite(metrics['absrel']) and \
                         (best_metrics is None or metrics['absrel'] < best_metrics['absrel']):
                     best_metrics = metrics
-                    best_num_source_views = num_source_views
+                    best_metrics['num_views'] = num_source_views
                     best_pred = pred
+
+            if self.eval_uncertainty:
+                uncertainty_metrics = self._compute_uncertainty_metrics(sample_inputs=cur_sample_inputs,
+                                                                        sample_gt=cur_sample_gt,
+                                                                        pred=best_pred)
+                best_metrics.update(uncertainty_metrics)
+
+            # log best metrics for this sample:
+            self._log_metrics(best_metrics, 'best')
 
             # compute and log qualitatives:
             if should_qualitative:
                 qualitatives = self._compute_qualitatives(sample_inputs=sample_inputs, sample_gt=sample_gt,
                                                           pred=best_pred)
                 self._log_qualitatives(qualitatives)
-
-            # log best metrics for this sample:
-            self._log_metrics(best_metrics, 'best')
-            self._log_metrics({'num_views': best_num_source_views}, 'best')
-
-            if self.eval_uncertainty:
-                uncertainty_metrics = self._compute_uncertainty_metrics(sample_inputs=cur_sample_inputs,
-                                                                        sample_gt=cur_sample_gt,
-                                                                        pred=best_pred)
-                self._log_metrics(uncertainty_metrics, 'best')
-                # TODO reorder qualitatives, logging and uncertainty evaluation; maybe first put uncertainty metrics into best_metrics
+                # write dataset update only for samples where we computed qualitatives:
+                self._add_dataset_update(best_metrics)
 
             if self.verbose:
                 print(f"Sample with index {self.cur_sample_idx} has AbsRel={best_metrics['absrel']} "
-                      f"with {best_num_source_views} source views.\n")
+                      f"with {best_metrics['num_views']} source views.\n")
 
         return self.results
 
@@ -323,36 +321,24 @@ class MultiViewDepthEvaluation:
 
         for qualitative_name, qualitative in qualitatives.items():
             out_path = osp.join(self.qualitatives_dir, f'{self.cur_sample_idx:07d}-{qualitative_name}')
-            np.save(out_path + '.npy', qualitative)
-            vis(qualitative).save(out_path + '.png')
+            npy_path = out_path + '.npy'
+            png_path = out_path + '.png'
+            np.save(npy_path, qualitative)
+            vis(qualitative).save(png_path)
 
-            # TODO self.add_update(sample_num, qualitative_name, out_path, is_info=False)
+            self._add_dataset_update({qualitative_name: npy_path})
 
-    # def _add_update(self, sample_num, update_name, update_value, is_info=False):
-    #     update_name = update_name if not is_info else "_" + update_name
-    #
-    #     if sample_num in self.cur_updates:
-    #         self.cur_updates[sample_num][update_name] = update_value
-    #     elif not is_info:  # we dont create an update for a sample num when there is only info data
-    #         self.cur_updates[sample_num] = {update_name: update_value}
-    #
-    # def _output_dataset_cfg(self):
-    #
-    #     with open(self.test_dataset_updates_path, 'wb') as dataset_udpates_file:
-    #         pickle.dump(self.cur_updates, dataset_udpates_file)
-    #
-    #     dataset_layout = self.cur_test.get_layout()
-    #     dataset_layout.write(self.test_dataset_layout_path)
-    #
-    #     dataset_cls_name = SCHEDULE.cur_test.dataset_cls_name
-    #     self.cur_test_dataset.write_config(path=self.test_dataset_cfg_path, dataset_cls_name=dataset_cls_name,
-    #                                        updates=[self.test_dataset_updates_path], update_strict=True,
-    #                                        layouts=[self.test_dataset_layout_path])
+    def _add_dataset_update(self, update_dict):
+        if self.cur_sample_idx not in self.dataset_updates:
+            self.dataset_updates[self.cur_sample_idx] = MultiMultiViewDepthEvaluationUpdate()
+
+        self.dataset_updates[self.cur_sample_idx].update_dict.update(update_dict)
 
     def _reset_evaluation(self):
         self.dataset = None
         self.dataloader = None
         self.model = None
+        self.exp_name = None
         self.sample_indices = None
         self.qualitative_indices = None
         self.burn_in_samples = None
@@ -360,6 +346,7 @@ class MultiViewDepthEvaluation:
         self.cur_sample_num = 0
         self.results = None
         self.sparsification_curves = None
+        self.dataset_updates = None
 
     def _init_results(self):
         self.results = pd.DataFrame()
@@ -372,6 +359,8 @@ class MultiViewDepthEvaluation:
             columns = pd.Index(x, name="frac_removed")
             index = pd.MultiIndex.from_tuples([], names=("sample_idx", "curve"))
             self.sparsification_curves = pd.DataFrame(columns=columns, index=index)
+            
+        self.dataset_updates = {}
 
     def _get_source_view_ordering(self, sample_inputs, sample_gt):
         if self.view_ordering == 'quasi-optimal':
@@ -392,19 +381,9 @@ class MultiViewDepthEvaluation:
 
         for source_idx in source_indices:
             # construct temporary sample with a single source view:
-            cur_sample_inputs = deepcopy(sample_inputs)
+            indices_to_keep = [keyview_idx, source_idx]
             cur_sample_gt = deepcopy(sample_gt)
-            if "images" in self.inputs:
-                cur_sample_inputs['images'] = [cur_sample_inputs['images'][keyview_idx],
-                                               cur_sample_inputs['images'][source_idx]]
-            if "poses" in self.inputs:
-                cur_sample_inputs['poses'] = [cur_sample_inputs['poses'][keyview_idx],
-                                              cur_sample_inputs['poses'][source_idx]]
-            if "intrinsics" in self.inputs:
-                cur_sample_inputs['intrinsics'] = [cur_sample_inputs['intrinsics'][keyview_idx],
-                                                   cur_sample_inputs['intrinsics'][source_idx]]
-            cur_sample_inputs['keyview_idx'] = np.array([0])
-            # depth_range is not changed
+            cur_sample_inputs = filter_views_in_sample(sample=sample_inputs, indices_to_keep=indices_to_keep)
 
             # run model:
             pred, _, _ = self._run_model(cur_sample_inputs)
@@ -491,7 +470,6 @@ class MultiViewDepthEvaluation:
             del gt_invdepth
             pred['least_squares_scale'] = scale
             pred['least_squares_shift'] = shift
-
 
         if isinstance(self.clip_pred_depth, tuple):
             pred_depth = np.clip(pred_depth, self.clip_pred_depth[0], self.clip_pred_depth[1]) * pred_mask
@@ -635,3 +613,131 @@ class MultiViewDepthEvaluation:
                 sparsification_curves.to_csv(osp.join(self.quantitatives_dir, "sparsification_curves.csv"))
                 sample_sparsification_curves.to_pickle(osp.join(self.sample_results_dir, "sparsification_curves.pickle"))
                 sample_sparsification_curves.to_csv(osp.join(self.sample_results_dir, "sparsification_curves.csv"))
+
+            self._output_dataset_cfg()
+
+    def _output_dataset_cfg(self):
+
+        update_name = "_".join([s for s in [self.model.name, self.exp_name] if s is not None])
+        dataset_updates_path = osp.join(self.qualitatives_dir, f"{update_name}.pickle")
+        dataset_layout_path = osp.join(self.qualitatives_dir, "layout.pickle")
+        dataset_cfg_path = osp.join(self.qualitatives_dir, "dataset.cfg")
+        with open(dataset_updates_path, 'wb') as dataset_udpates_file:
+            pickle.dump(self.dataset_updates, dataset_udpates_file)
+
+        dataset_layout = self._get_layout()
+        dataset_layout.write(dataset_layout_path)
+
+        dataset_cls_name = get_full_class_name(self.dataset)
+        self.dataset.write_config(path=dataset_cfg_path, dataset_cls_name=dataset_cls_name,
+                                  updates=[dataset_updates_path], update_strict=True,
+                                  layouts=[dataset_layout_path])
+
+    def _get_layout(self):
+        layout = Layout(name="eval_mvd")
+
+        def load_key_img(sample_dict):
+            from itypes.vizdata.image import ImageVisualizationData
+            key_img = sample_dict['images'][sample_dict['keyview_idx']].transpose(1, 2, 0).astype(np.uint8)
+            key_img = ImageVisualizationData(key_img)
+            return {'data': key_img}
+
+        key_img_visualization = Visualization(col=0, row=0, visualization_type="image", load_fct=load_key_img, name="Key Image")
+        layout.visualizations.append(key_img_visualization)
+
+        def load_gt_depth(sample_dict):
+            from itypes.vizdata.float import FloatVisualizationData
+            depth = sample_dict['depth'].transpose(1, 2, 0)
+            depth = FloatVisualizationData(depth)
+            return {'data': depth}
+
+        gt_depth_visualization = Visualization(col=0, row=1, visualization_type="float", load_fct=load_gt_depth, name="GT Depth")
+        layout.visualizations.append(gt_depth_visualization)
+
+        def load_gt_invdepth(sample_dict):
+            from itypes.vizdata.float import FloatVisualizationData
+            invdepth = sample_dict['invdepth'].transpose(1, 2, 0)
+            invdepth = FloatVisualizationData(invdepth)
+            return {'data': invdepth}
+
+        gt_invdepth_visualization = Visualization(col=1, row=1, visualization_type="float", load_fct=load_gt_invdepth, name="GT Inverse Depth")
+        layout.visualizations.append(gt_invdepth_visualization)
+
+        def load_gt_depth_mask(sample_dict):
+            from itypes.vizdata.float import FloatVisualizationData
+            mask = (sample_dict['depth'] > 0).astype(np.float32).transpose(1, 2, 0)
+            mask = FloatVisualizationData(mask)
+            return {'data': mask}
+
+        gt_depth_mask_visualization = Visualization(col=2, row=1, visualization_type="float", load_fct=load_gt_depth_mask, name="GT Mask")
+        layout.visualizations.append(gt_depth_mask_visualization)
+
+        def load_pred_depth(sample_dict):
+            from itypes.vizdata.float import FloatVisualizationData
+            depth = sample_dict['pred_depth'].transpose(1, 2, 0)
+            depth = FloatVisualizationData(depth)
+            return {'data': depth}
+
+        pred_depth_visualization = Visualization(col=0, row=2, visualization_type="float", load_fct=load_pred_depth, name="Predicted Depth")
+        layout.visualizations.append(pred_depth_visualization)
+
+        def load_pred_invdepth(sample_dict):
+            from itypes.vizdata.float import FloatVisualizationData
+            invdepth = sample_dict['pred_invdepth'].transpose(1, 2, 0)
+            invdepth = FloatVisualizationData(invdepth)
+            return {'data': invdepth}
+
+        pred_invdepth_visualization = Visualization(col=1, row=2, visualization_type="float", load_fct=load_pred_invdepth, name="Predicted Inverse Depth")
+        layout.visualizations.append(pred_invdepth_visualization)
+
+        def load_pointwise_absrel(sample_dict):
+            from itypes.vizdata.float import FloatVisualizationData
+            pointwise_absrel = sample_dict['pointwise_absrel'].transpose(1, 2, 0)
+            pointwise_absrel = FloatVisualizationData(pointwise_absrel)
+            return {'data': pointwise_absrel}
+
+        pointwise_absrel_visualization = Visualization(col=2, row=2, visualization_type="float", load_fct=load_pointwise_absrel, name="Absolute Relative Error")
+        layout.visualizations.append(pointwise_absrel_visualization)
+
+        if self.eval_uncertainty:
+            def load_pred_depth_uncertainty(sample_dict):
+                from itypes.vizdata.float import FloatVisualizationData
+                uncertainty = sample_dict['pred_depth_uncertainty'].transpose(1, 2, 0)
+                uncertainty = FloatVisualizationData(uncertainty)
+                return {'data': uncertainty}
+
+            pred_depth_uncertainty_visualization = Visualization(col=3, row=2, visualization_type="float", load_fct=load_pred_depth_uncertainty, name="Predicted Depth Uncertainty")
+            layout.visualizations.append(pred_depth_uncertainty_visualization)
+
+        return layout
+
+
+def filter_views_in_sample(sample, indices_to_keep):
+    sample = deepcopy(sample)
+    keyview_idx = int(sample['keyview_idx'])
+    assert keyview_idx in indices_to_keep, "Keyview must not be filtered out."
+    keyview_idx = indices_to_keep.index(keyview_idx)
+
+    if "images" in sample:
+        sample['images'] = [select_by_index(sample['images'], i) for i in indices_to_keep]
+    if "poses" in sample:
+        sample['poses'] = [select_by_index(sample['poses'], i) for i in indices_to_keep]
+    if "intrinsics" in sample:
+        sample['intrinsics'] = [select_by_index(sample['intrinsics'], i) for i in indices_to_keep]
+    sample['keyview_idx'] = np.array([keyview_idx])
+
+    return sample
+
+
+class MultiMultiViewDepthEvaluationUpdate(Update):
+    def __init__(self):
+        self.update_dict = {}
+
+    def load(self, orig_sample_dict, root=None):
+        out_dict = {}
+        for key, val in self.update_dict.items():
+            if isinstance(val, str):
+                if osp.isfile(val):
+                    val = np.load(val)
+            out_dict[key] = val
+        return out_dict

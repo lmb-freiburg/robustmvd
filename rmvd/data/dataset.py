@@ -10,6 +10,8 @@ import pytoml
 
 import rmvd.utils as utils
 from .transforms import Resize
+from .updates import Updates, PickledUpdates
+from .layout import Layout
 
 
 class Sample(metaclass=abc.ABCMeta):
@@ -21,7 +23,8 @@ class Sample(metaclass=abc.ABCMeta):
 
 class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
-    def __init__(self, root, aug_fcts=None, input_size=None, to_torch=False, layouts=None, verbose=True):
+    def __init__(self, root, aug_fcts=None, input_size=None, to_torch=False, updates=None, update_strict=False,
+                 layouts=None, verbose=True):
 
         aug_fcts = [] if aug_fcts is None else aug_fcts
         aug_fcts = [aug_fcts] if not isinstance(aug_fcts, list) else aug_fcts
@@ -43,9 +46,14 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         self._init_samples()
         self._layouts = {}
         self._init_layouts(layouts)
+        self._allowed_indices = []
+        self.updates = []
+        self._init_updates(updates, update_strict)
 
         if self.verbose:
             print(f"\tNumber of samples: {len(self)}")
+            if len(self.updates) > 0:
+                print(f"\tUpdates: {', '.join([update.name for update in self.updates])}")
             if self.resize is not None:
                 print(f"\tImage resolution (height, width): ({input_size[0]}, {input_size[1]})")
             print(f"Finished initializing dataset {self.name}.")
@@ -59,6 +67,13 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
             name = f"{name}.{self.dataset_type}" if hasattr(self, "dataset_type") else name
         else:
             name = type(self).__name__
+        return name
+
+    @property
+    def full_name(self):
+        name = self.name
+        for update in self.updates:
+            name += f"+{update.name}"
         return name
 
     def _init_root(self, root):
@@ -80,9 +95,25 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         with open(sample_list_path, 'rb') as sample_list:
             self.samples = pickle.load(sample_list)
 
+    def _init_updates(self, updates, update_strict=False):
+
+        if updates is not None:
+            for update in updates:
+                if isinstance(update, Updates):
+                    update = update
+                elif isinstance(update, str):
+                    update = PickledUpdates(path=update, verbose=False)
+                self.updates.append(update)
+
+        if update_strict:
+            self._allowed_indices = [i for i in range(len(self.samples)) if all([i in update for update in self.updates])]
+        else:
+            self._allowed_indices = list(range(len(self.samples)))
+
     def _init_layouts(self, layouts):
         if layouts is not None:
             for layout in layouts:
+                layout = layout if isinstance(layout, Layout) else Layout.from_file(layout)
                 self.add_layout(layout)
 
     def add_layout(self, layout):
@@ -96,10 +127,11 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         return self._layouts[layout_name.lower()]
 
     def __len__(self):
-        return len(self.samples)
+        return len(self._allowed_indices)
 
     def __getitem__(self, index):
 
+        index = self._allowed_indices[index]
         sample = self.samples[index]
 
         if not self._seed_initialized:
@@ -112,9 +144,12 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
         sample_dict = sample.load(root=self.root)
         sample_dict['_index'] = index
-        sample_dict['_dataset'] = self.name
+        sample_dict['_dataset'] = self.full_name
 
         _preprocess_sample(sample_dict)
+
+        for update in self.updates:
+            update.apply_update(sample_dict, index=index)
 
         for aug_fct in self.aug_fcts:
             aug_fct(sample_dict)
@@ -166,6 +201,46 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         end = time.time()
         print("Total time for loading {} batches: %1.4fs.".format(num_batches) % (end - start))
         print("Mean time per batch: %1.4fs." % ((end - start)/num_batches))
+
+    @classmethod
+    def write_config(cls, path, dataset_cls_name, aug_fcts=None, input_size=None, to_torch=False, updates=None,
+                     update_strict=False, layouts=None):
+
+        config = {'dataset_cls_name': dataset_cls_name,
+                  'aug_fcts': aug_fcts,
+                  'input_size': input_size,
+                  'to_torch': to_torch,
+                  'updates': updates,
+                  'update_strict': update_strict,
+                  'layouts': layouts}
+
+        with open(path, 'wb') as file:
+            pickle.dump(config, file)
+
+    @classmethod
+    def from_config(cls, path, more_updates=None, more_layouts=None, verbose=None):
+        with open(path, 'rb') as file:
+            config = pickle.load(file)
+
+        if more_updates is not None:
+            more_updates = [more_updates] if not isinstance(more_updates, list) else more_updates
+            updates = config['updates'] if 'updates' in config else []
+            updates += more_updates
+            config['updates'] = updates
+
+        if more_layouts is not None:
+            more_layouts = [more_layouts] if not isinstance(more_layouts, list) else more_layouts
+            layouts = config['layouts'] if 'layouts' in config else []
+            layouts += more_layouts
+            config['layouts'] = layouts
+
+        if verbose is not None:
+            config['verbose'] = verbose
+
+        dataset_cls_name = config['dataset_cls_name']
+        del config['dataset_cls_name']
+        dataset_cls = utils.get_class(dataset_cls_name)
+        return dataset_cls(**config)
 
 
 def _get_paths():
