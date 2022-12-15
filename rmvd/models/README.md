@@ -112,6 +112,22 @@ this `README`).
 
 It is not necessary to install additional dependencies.
 
+### `vis_mvsnet_wrapped`
+This is the Vis-MVSNet model presented in the publication "Visibility-aware Multi-view Stereo Network" by Zhang et al.
+The model is wrapped around the original implementation from <https://github.com/jzhangbs/Vis-MVSNet.git>.
+
+#### Setup:
+From the directory of this `README` file, execute the script `scripts/setup_vis_mvsnet.sh` and specify the local
+directory to clone the original repository:
+```bash
+./scripts/setup_vis_mvsnet.sh /path/to/vis_mvsnet
+```
+
+Then specify the local directory `/path/to/vis_mvsnet` in the `wrappers/paths.toml` file (relative to the directory of  
+this `README`).
+
+It is not necessary to install additional dependencies.
+
 ---
 
 ## Usage

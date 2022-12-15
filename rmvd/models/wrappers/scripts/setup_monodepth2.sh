@@ -2,14 +2,14 @@
 
 if [ -z "$1" ]
 then
-   echo "Please path a target path to this script, e.g.: /setup_monodepth2.sh /path/to/monodepth2.";
+   echo "Please speficy a target path to this script, e.g.: /setup_monodepth2.sh /path/to/monodepth2";
    exit 1
 fi
 
 set -e
 TARGET="$1"
 
-echo "Downloading monodepth2 repository https://github.com/nianticlabs/monodepth2 to $TARGET."
+echo "Downloading monodepth2 repository https://github.com/nianticlabs/monodepth2 to $TARGET"
 mkdir -p "$1"
 
 git clone https://github.com/nianticlabs/monodepth2 $TARGET
