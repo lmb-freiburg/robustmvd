@@ -128,6 +128,30 @@ this `README`).
 
 It is not necessary to install additional dependencies.
 
+### `cvp_mvsnet_wrapped`
+This is the CVP-MVSNet model presented in the publication 
+"Cost Volume Pyramid Based Depth Inference for Multi-View Stereo" by Yang et al.
+The model is wrapped around the original implementation from <https://github.com/JiayuYANG/CVP-MVSNet>.
+
+#### Setup:
+From the directory of this `README` file, execute the script `scripts/setup_cvp_mvsnet.sh` and specify the local
+directory to clone the original repository:
+```bash
+./scripts/setup_cvp_mvsnet.sh /path/to/cvp_mvsnet
+```
+
+Then specify the local directory `/path/to/cvp_mvsnet` in the `wrappers/paths.toml` file (relative to the directory of  
+this `README`).
+
+It is not necessary to install additional dependencies.
+
+#### Misc:
+With the original implementation, the number of calculated depth hypotheses is sometimes too small. We apply a small
+patch (see `cvp_mvsnet.patch` file) to fix this.
+
+Further, the implementation does not support running the model with a single source view. It is therefore not possible
+to evaluate the model with the `quasi-optimal` view selection, but only with the `nearest` view selection strategy.
+
 ---
 
 ## Usage
@@ -237,7 +261,7 @@ The conversion may for example include converting the inputs to `torch.Tensor`, 
 normalizing the images, etc.
 
 ### The `forward` function (for non-pytorch model this function is named `__call__`)
-The `_forward` function of each model expects data in the model-specific format and returns model-specific outputs.
+The `forward` function of each model expects data in the model-specific format and returns model-specific outputs.
 
 Hence, in case all input data is already in the format required by the model, you can also do `model(**sample)`. 
 This is used in the `rmvd` training code. 

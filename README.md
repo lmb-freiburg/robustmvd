@@ -172,6 +172,7 @@ format and to call the model. For details about these functions, see [rmvd/model
 - [ ] add project page including an overview of the benchmark and a leaderboard
 - [ ] improve Tanks and Temples GT Depth
 - [ ] add code to train the models
+- [ ] add code to run inference directly from COLMAP or Meshroom outputs
 
 ## Changelog
 ### Sept 13 2022 First version
