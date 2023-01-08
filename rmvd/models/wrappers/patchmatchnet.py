@@ -20,28 +20,37 @@ from rmvd.utils import (
 from rmvd.data.transforms import Resize
 
 
-class CVPMVSNet_Wrapped(nn.Module):
+class PatchmatchNet_Wrapped(nn.Module):
     def __init__(self, num_sampling_steps=192):
         super().__init__()
 
         import sys
 
         paths_file = osp.join(osp.dirname(osp.realpath(__file__)), "paths.toml")
-        repo_path = get_path(paths_file, "cvp_mvsnet", "root")
-        sys.path.insert(0, osp.join(repo_path, "CVP_MVSNet"))
+        repo_path = get_path(paths_file, "patchmatchnet", "root")
+        sys.path.insert(0, repo_path)
 
-        from models.net import network
+        from models.net import PatchmatchNet
 
-        self.args = EasyDict({  # parameters are taken from original repository when executing eval.sh script
-            'nsrc': None,  # will be set in forward()
-            'nscale': 5,
-            'mode': 'test',
-        })
-        self.model = network(self.args)
-        state_dict = torch.load(osp.join(repo_path, "CVP_MVSNet/checkpoints/pretrained/model_000027.ckpt"))[
-            "model"
-        ]
-        self.model.load_state_dict(state_dict, strict=False)
+        patchmatch_interval_scale = [0.005, 0.0125, 0.025]
+        patchmatch_range = [6, 4, 2]
+        patchmatch_iteration = [1, 2, 2]
+        patchmatch_num_sample = [8, 8, 16]
+        propagate_neighbors = [0, 8, 16]
+        evaluate_neighbors = [9, 9, 9]
+        self.model = PatchmatchNet(
+            patchmatch_interval_scale=patchmatch_interval_scale,
+            propagation_range=patchmatch_range,
+            patchmatch_iteration=patchmatch_iteration,
+            patchmatch_num_sample=patchmatch_num_sample,
+            propagate_neighbors=propagate_neighbors,
+            evaluate_neighbors=evaluate_neighbors
+        )
+        state_dict = torch.load(osp.join(repo_path, "checkpoints/params_000007.ckpt"))["model"]
+        fixed_weights = {}
+        for k, v in state_dict.items():
+            fixed_weights[k[7:]] = v
+        self.model.load_state_dict(fixed_weights)
 
         self.num_sampling_steps = num_sampling_steps
 
@@ -50,21 +59,10 @@ class CVPMVSNet_Wrapped(nn.Module):
     ):
         device = get_torch_model_device(self)
 
-        orig_ht, orig_wd = images[0].shape[-2:]
-        ht, wd = int(math.ceil(orig_ht / 64.0) * 64.0), int(
-            math.ceil(orig_wd / 64.0) * 64.0
-        )
-        if (orig_ht != ht) or (orig_wd != wd):
-            resized = Resize(size=(ht, wd))(
-                {"images": images, "intrinsics": intrinsics}
-            )
-            images = resized["images"]
-            intrinsics = resized["intrinsics"]
-
         # normalize images
         images = [image / 255.0 for image in images]
 
-        depth_range = [np.array([0.2]), np.array([100])] if depth_range is None else depth_range
+        depth_range = [np.array([0.2], dtype=np.float32), np.array([100], dtype=np.float32)] if depth_range is None else depth_range
         min_depth, max_depth = depth_range
 
         images, keyview_idx, poses, intrinsics, min_depth, max_depth = to_torch(
@@ -85,35 +83,22 @@ class CVPMVSNet_Wrapped(nn.Module):
     def forward(self, images,  poses, intrinsics, keyview_idx, min_depth, max_depth, **_):
         image_key = select_by_index(images, keyview_idx)
         images_source = exclude_index(images, keyview_idx)
-        self.args.nsrc = len(images_source)
-        images_source = torch.stack(images_source, dim=1)  # N, NV, 3, H, W
+        images = [image_key] + images_source
 
         intrinsics_key = select_by_index(intrinsics, keyview_idx)  # N, 3, 3
-        intrinsics_source = exclude_index(intrinsics, keyview_idx)  # N, NV, 3, 3
-        intrinsics_source = torch.stack(intrinsics_source, dim=1)  # N, NV, 3, 3
+        intrinsics_source = exclude_index(intrinsics, keyview_idx)
+        intrinsics = [intrinsics_key] + intrinsics_source
+        intrinsics = torch.stack(intrinsics, dim=1)  # N, NV, 3, 3
 
         pose_key = select_by_index(poses, keyview_idx)  # N, 4, 4
         poses_source = exclude_index(poses, keyview_idx)
-        poses_source = torch.stack(poses_source, dim=1)  # N, NV, 4, 4
+        poses = [pose_key] + poses_source
+        poses = torch.stack(poses, dim=1)  # N, NV, 4, 4
 
-        inp = {
-            "ref_img": image_key,
-            "src_imgs": images_source,
-            "ref_in": intrinsics_key,
-            "src_in": intrinsics_source,
-            "ref_ex": pose_key,
-            "src_ex": poses_source,
-            "depth_min": min_depth,
-            "depth_max": max_depth,
-        }
-
-        outputs = self.model(**inp)
-        pred_depth = outputs["depth_est_list"][0]  # N, H, W
-        pred_depth_confidence = outputs["prob_confidence"]
-        pred_depth_uncertainty = 1 - pred_depth_confidence  # N, H, W
-
-        pred_depth = pred_depth.unsqueeze(1)
-        pred_depth_uncertainty = pred_depth_uncertainty.unsqueeze(1)
+        pred_depth, pred_depth_confidence, _ = self.model.forward(images, intrinsics, poses, min_depth, max_depth)
+        # N, 1, H, W and N, H, W
+        pred_depth_confidence = pred_depth_confidence.unsqueeze(1)
+        pred_depth_uncertainty = 1 - pred_depth_confidence
 
         pred = {"depth": pred_depth, "depth_uncertainty": pred_depth_uncertainty}
         aux = {}
@@ -126,7 +111,7 @@ class CVPMVSNet_Wrapped(nn.Module):
 
 
 @register_model
-def cvp_mvsnet_wrapped(
+def patchmatchnet_wrapped(
     pretrained=True, weights=None, train=False, num_gpus=1, **kwargs
 ):
     assert pretrained and (
@@ -138,7 +123,7 @@ def cvp_mvsnet_wrapped(
     }
 
     model = build_model_with_cfg(
-        model_cls=CVPMVSNet_Wrapped,
+        model_cls=PatchmatchNet_Wrapped,
         cfg=cfg,
         weights=None,
         train=train,
