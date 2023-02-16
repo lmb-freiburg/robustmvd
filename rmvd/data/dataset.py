@@ -24,7 +24,7 @@ class Sample(metaclass=abc.ABCMeta):
 class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
     def __init__(self, root, aug_fcts=None, input_size=None, to_torch=False, updates=None, update_strict=False,
-                 layouts=None, verbose=True):
+                 layouts=None, verbose=True, **kwargs):
 
         aug_fcts = [] if aug_fcts is None else aug_fcts
         aug_fcts = [aug_fcts] if not isinstance(aug_fcts, list) else aug_fcts
@@ -34,7 +34,7 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         self._init_root(root)
 
         if self.verbose:
-            print(f"Initializing dataset {self.name} from {self.root}.")
+            print(f"Initializing dataset {self.name} from {self.root}")
 
         self._seed_initialized = False
         self.resize = Resize(size=input_size) if (input_size is not None and input_size[0] is not None and input_size[1] is not None) else None  # TODO: handle case where input_size is scaler; move this to input_size setter
@@ -43,7 +43,7 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         self.to_torch = to_torch
 
         self.samples = []
-        self._init_samples()
+        self._init_samples(**kwargs)
         self._layouts = {}
         self._init_layouts(layouts)
         self._allowed_indices = []
@@ -90,8 +90,12 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
             self.aug_fcts.append(aug_fct)
 
     def _init_samples(self):
+        self._init_samples_from_list()
+        
+    def _init_samples_from_list(self):
         sample_list_path = _get_sample_list_path(self.name)
-        print("\tInitializing samples from list at {}.".format(sample_list_path))
+        if self.verbose:
+            print("\tInitializing samples from list at {}.".format(sample_list_path))
         with open(sample_list_path, 'rb') as sample_list:
             self.samples = pickle.load(sample_list)
 

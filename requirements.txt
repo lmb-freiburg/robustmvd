@@ -11,3 +11,4 @@ scikit-image
 pyqt5
 dill
 easydict
+wandb

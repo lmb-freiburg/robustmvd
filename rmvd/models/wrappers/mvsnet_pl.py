@@ -138,7 +138,7 @@ class MVSNet_pl_Wrapped(nn.Module):
         return to_numpy(pred), to_numpy(aux)
 
 
-@register_model
+@register_model(trainable=False)
 def mvsnet_pl_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
     cfg = {"sample_in_inv_depth_space": False, "num_sampling_steps": 192}

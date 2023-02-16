@@ -5,7 +5,8 @@ import numpy as np
 from PIL import Image
 
 from .dataset import Dataset, Sample
-from .registry import register_dataset, register_default_dataset
+from .registry import register_default_dataset
+from .layouts import MVDUnstructuredDefaultLayout, AllImagesLayout
 
 
 def readPFM(file):  # TODO: move to rmvd utils
@@ -46,7 +47,7 @@ def load_image(root, path):
     path = f"blended_images/{path:08d}_masked.jpg"
     img_path = osp.join(root, path)
     img = np.array(Image.open(img_path))
-    img = img.transpose(2, 0, 1)  # 3,H,W ; dtype np.uint8
+    img = img.transpose(2, 0, 1).astype(np.float32)  # 3,H,W ; dtype np.uint8
     return img
 
 
@@ -73,7 +74,9 @@ def load_intrinsics(root, path):
 def load_depth(root, path):
     path = f"rendered_depth_maps/{path:08d}.pfm"
     depth = readPFM(osp.join(root, path))
-    return depth  # H, W, np.float32
+    depth = np.nan_to_num(depth, posinf=0., neginf=0., nan=0.)
+    depth = np.expand_dims(depth, 0).astype(np.float32)  # 1HW
+    return depth  # 1, H, W, np.float32
 
 
 def load(key, root, val):
@@ -118,6 +121,13 @@ class BlendedMVSSeq4Train(Dataset):
     split = 'seq4_train'
     dataset_type = 'mvd'
 
-    def __init__(self, root=None, **kwargs):
+    def __init__(self, root=None, layouts=None, **kwargs):
         root = root if root is not None else self._get_path("blendedmvs", "root")
-        super().__init__(root=root, **kwargs)
+
+        default_layouts = [
+            MVDUnstructuredDefaultLayout("default", num_views=5, max_views=5),
+            AllImagesLayout("all_images", num_views=5),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)

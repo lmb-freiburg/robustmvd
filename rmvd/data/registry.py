@@ -159,5 +159,7 @@ def get_dataset(dataset_name, dataset_type=None, split=None):
     base_dataset, dataset_type, split = _split_dataset_name(dataset_name=dataset_name,
                                                             dataset_type=dataset_type,
                                                             split=split)
+    
+    # TODO: add assert that dataset is registered
 
     return _datasets[(base_dataset, dataset_type, split)]

@@ -10,6 +10,15 @@ class CompoundDataset(torch.utils.data.Dataset):
         self.dataset_start_indices = [0] + list(np.cumsum(self.dataset_lens))[:-1]
         self.common_keys = common_keys
 
+    def name(self):
+        return "+".join([dataset.name for dataset in self.datasets])
+
+    def full_name(self):
+        return "+".join([dataset.full_name for dataset in self.datasets])
+
+    def __str__(self):
+        return self.name()
+
     def __getitem__(self, index):
         for dataset_idx, dataset_start in enumerate(self.dataset_start_indices):
             if (dataset_idx == len(self.datasets)-1) or (self.dataset_start_indices[dataset_idx+1] > index):

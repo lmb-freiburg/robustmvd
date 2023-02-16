@@ -1,3 +1,6 @@
+#torch.backends.cudnn.benchmark = True  # type: ignore
+
+
 class Training:
     def __init__(self, model, dataset, optimizer, scheduler, loss_fct, out_dir):
         self.model = model

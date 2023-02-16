@@ -35,7 +35,7 @@ class MultiViewDepthEvaluation:
 
     Args:
         out_dir: Directory where results will be written. If None, results are not written to disk.
-        inputs: List of input modalities that are supplied to the algorithm.
+        inputs: List of input modalities that are supplied to the model.
             Can include: ["images", "intrinsics", "poses", "depth_range"].
             Default: ["images"]
         alignment: Alignment between predicted and ground truth depths. Options are None, "median", "translation".

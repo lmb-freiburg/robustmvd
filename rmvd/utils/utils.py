@@ -236,6 +236,10 @@ def check_torch_model_cuda(model):
     return is_cuda
 
 
+def count_torch_model_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
 def select_by_index(l, idx):
     """Select an element from a list by an index. Supports data batches with different indices.
 
@@ -324,3 +328,8 @@ def get_path(paths_file, *keys):
                 paths = paths[key]
 
     return path
+
+
+def normalize(x, dim=None, eps=1e-9):
+    norm = torch.linalg.norm(x, dim=dim, keepdim=True)
+    return x / (norm + eps)

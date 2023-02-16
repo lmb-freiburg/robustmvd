@@ -2,6 +2,8 @@ import os
 import functools
 
 import numpy as np
+import torch
+from torch.utils.tensorboard.summary import make_np
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 
@@ -15,7 +17,6 @@ _DEFAULT_BBOX_COLOR = (238, 232, 213)
 _DEFAULT_BBOX_STROKE = None
 _DEFAULT_TEXT_COLOR = (0, 43, 54)
 _DEFAULT_CMAP = 'turbo'
-# RobustMVD paper uses turbo colormap ( https://ai.googleblog.com/2019/08/turbo-improved-rainbow-colormap-for.html )
 
 
 def _get_default_font(size=None):
@@ -69,8 +70,14 @@ def _cmap_max_str(cmap_name):
         ''
 
 
-def _get_draw_text(text, text_off, image_range_text, image_range_text_off):
+def _get_draw_text(text, label, text_off, image_range_text, image_range_text_off):
     draw_text = ""
+    
+    if label is not None:
+        draw_text += str(label)
+        if (not text_off) or (not image_range_text_off):
+            draw_text += "\n"
+    
     if text is not None and not text_off:
         draw_text += text
         if not image_range_text_off:
@@ -97,9 +104,7 @@ def _convert_to_out_format(img, out_format):
     if out_format['type'] == 'PIL':
         out = img
     elif out_format['type'] == 'np':
-        out = np.array(img, dtype=out_format['dtype'] if 'dtype' in out_format else None)
-        out = np.transpose(out, [2, 0, 1]) if 'channels' in out_format and out_format['channels'] == 'CHW' else out
-
+        out = np.array(img, dtype=out_format['dtype'] if 'dtype' in out_format else None).transpose(2, 0, 1)
     return out
 
 
@@ -120,18 +125,113 @@ def _apply_out_action(out, out_action, out_format):
             out.show()
 
 
-def vis(arr, colorize=True,
-        clipping=False, upper_clipping_thresh=None, lower_clipping_thresh=None,
-        mark_clipping=False, clipping_color=None,
-        invalid_values=None, mark_invalid=False, invalid_color=None,
-        text=None, cmap=_DEFAULT_CMAP,
-        image_range_text_off=False, image_range_colors_off=False, text_off=False,
-        out_format=None, out_action=None):
-    """
-    Creates a visualization of a 2d numpy array and returns it as a PIL image.
+def cat_images_colwise(imgs):
+    if isinstance(imgs[0], Image.Image):  # PIL
+        img = np.concatenate([np.array(img) for img in imgs], axis=1)
+        img = Image.fromarray(img)
+    else:  # np, shape CHW
+        img = np.concatenate(imgs, axis=2)
+    return img
+
+
+def cat_images_rowwise(imgs):
+    if isinstance(imgs[0], Image.Image):  # PIL
+        img = np.concatenate([np.array(img) for img in imgs], axis=0)
+        img = Image.fromarray(img)
+    else:  # np, shape CHW
+        img = np.concatenate(imgs, axis=1)
+    return img
+
+
+def vis(arr, **kwargs):
+    """Creates a visualization of a 2d array or 3d image and returns it as a PIL image.
+
+    Input array can be a numpy array or a torch tensor. Input array can have a batch dimension.
 
     Args:
-        arr: 2D numpy array.
+        arr: Input array. Can be a numpy array or a torch tensor. Can have the following dimension:
+            2 dimensions: 2d array.
+            3 dimensions with 3 channels in the first dimension: image.
+            3 dimensions with N != 3 channels in the first dimension: batch of N 2d arrays.
+            4 dimensions with N channels in the first and 3 channels in the second dimension: batch of N images.
+            4 dimensions with N channels in the first and 1 channel in the second dimension: batch of N 2d arrays.
+        kwargs: See vis_2d_array and vis_image functions.
+    """
+
+    ndim = arr.ndim
+    shape = arr.shape
+
+    if ndim == 2:
+        return vis_2d_array(arr, **kwargs)
+    elif ndim == 3:
+        if shape[0] == 3:
+            return vis_image(arr, **kwargs)
+        else:
+            return vis_2d_array(arr, **kwargs)
+    elif ndim == 4:
+        if shape[1] == 3:
+            return vis_image(arr, **kwargs)
+        else:
+            assert shape[1] == 1, f"Can not visualize an array of shape {shape}."
+            return vis_2d_array(arr, **kwargs)
+    else:
+        raise ValueError(f"Can not visualize an array of shape {shape}.")
+
+
+def vis_2d_array(arr, full_batch=False, batch_labels=None, **kwargs):
+    """
+    Creates a visualization of a 2d numpy array or torch tensor.
+
+    Args:
+        arr: 2D numpy array or torch tensor.
+        full_batch: Indicates whether all samples in the batch should be visualized.
+            False: visualize only first sample in the batch.
+            True/"cols": visualize all samples in the batch by concatenating col-wise (side-by-side).
+            "rows": visualize all samples in the batch by concatenating row-wise.
+        kwargs: See _vis_single_2d_array function.
+    """
+
+    assert 2 <= arr.ndim <= 4, f"2d array must have 2, 3 or 4 dimensions, but got shape {arr.shape}"
+    if arr.ndim == 4:
+        assert arr.shape[1] == 1, f"First dimension in a 2d array with shape {arr.shape} must " \
+                                  f"be 1, but got {arr.shape[1]}."
+        arr = arr[:, 0, :, :]
+
+    arr = make_np(arr)
+
+    if full_batch:
+        arr = arr[None, ...] if arr.ndim == 2 else arr
+        imgs = []
+        for idx, ele in enumerate(arr):
+            if batch_labels is not None:
+                assert "label" not in kwargs, "It is not possible to use batch_labels and label argument at the same time."
+                img = _vis_single_2d_array(ele, label=batch_labels[idx], **kwargs)
+            else:
+                img = _vis_single_2d_array(ele, **kwargs)
+            imgs.append(img)
+
+        if full_batch == "rows":
+            return cat_images_rowwise(imgs)
+        else:
+            return cat_images_colwise(imgs)
+
+    else:
+        arr = arr[0] if arr.ndim == 3 else arr
+        return _vis_single_2d_array(arr, **kwargs)
+
+
+def _vis_single_2d_array(arr, colorize=True,
+                         clipping=False, upper_clipping_thresh=None, lower_clipping_thresh=None,
+                         mark_clipping=False, clipping_color=None,
+                         invalid_values=None, mark_invalid=False, invalid_color=None,
+                         text=None, label=None, cmap=_DEFAULT_CMAP,
+                         image_range_text_off=False, image_range_colors_off=False, text_off=False,
+                         out_format=None, out_action=None):
+    """
+    Creates a visualization of a 2d numpy array or torch tensor.
+
+    Args:
+        arr: 2D numpy array or torch tensor.
         colorize: If set to true, the values will be visualized by a colormap, otherwise as gray-values.
         clipping: If true, values above a certain threshold will be clipped before the visualization.
         upper_clipping_thresh: Threshold that is used for clipping the values. If set to False,
@@ -155,24 +255,20 @@ def vis(arr, colorize=True,
         out_format: Dict that describes the format of the output. All such dicts must have 'type' and 'mode' key.
         Currently supported are:
         {'type': 'PIL', 'mode': 'RGB' (see PIL docs for supported modes)} (this is the default format),
-        {'type': 'np', 'mode': 'RGB' (see PIL docs for supported modes), 'channels': 'CHW' (or 'HWC'), 'dtype': 'uint8'}.
+        {'type': 'np', 'mode': 'RGB' (see PIL docs for supported modes), 'dtype': 'uint8'}.
         out_action: Dict that describes an action on the output. All such dicts must have 'type' key.
         Note that some actions require a specific out_format.
         Currently supported are:
         None,
         {'type': 'show'}.
     """
+    assert arr.ndim == 2, f"Single 2d array must have 2 dimension, but got shape {arr.shape}"
+    arr = make_np(arr)
+
     arr = arr.astype(np.float32, copy=True)
     cmap_name = _DEFAULT_CMAP if cmap is None else cmap
     out_format = {'type': 'PIL', 'mode': 'RGB'} if out_format is None else out_format
     out_format['mode'] = 'RGB' if 'mode' not in out_format else out_format['mode']
-
-    # Remove additional dimensions of size 1 if required:
-    if arr.ndim > 2:
-        channel_dim = [i for i in range(arr.ndim) if np.size(arr, i) == 1]
-        # if arr.ndim - len(channel_dim) < 2:
-        #     print("WARNING: Channel dimensions were ambiguous!")
-        arr = arr.squeeze(axis=tuple(channel_dim[:arr.ndim-2]))
 
     # Filter out all values that are somehow invalid and set them to 0:
     arr, invalid_mask, invalid_values_mask, clipping_mask, upper_clipping_mask, lower_clipping_mask,\
@@ -252,7 +348,160 @@ def vis(arr, colorize=True,
     else:
         image_range_text = "Image: Constant: %0.3f" % min_value if is_constant else "Min (%s): %0.3f Max (%s): %0.3f" % (min_color, arr_min, max_color, arr_max)
 
-    draw_text = _get_draw_text(text, text_off, image_range_text, image_range_text_off)
+    draw_text = _get_draw_text(text, label, text_off, image_range_text, image_range_text_off)
+    img = add_text_to_img(img=img, text=draw_text, xy_leftbottom=(5, 5))
+
+    out = _convert_to_out_format(img, out_format)
+    _apply_out_action(out=out, out_action=out_action, out_format=out_format)
+
+    return out
+
+
+def vis_image(img, full_batch=False, batch_labels=None, **kwargs):
+    """
+    Creates a visualization of an image in form of a numpy array or torch tensor.
+
+    Args:
+        img: Image in form of a numpy array or torch tensor.
+        full_batch: Indicates whether all samples in the batch should be visualized.
+            False: visualize only first sample in the batch.
+            True/"cols": visualize all samples in the batch by concatenating col-wise (side-by-side).
+            "rows": visualize all samples in the batch by concatenating row-wise.
+        kwargs: See _vis_single_image function.
+    """
+
+    assert 3 <= img.ndim <= 4, f"Image array must have 3 or 4 dimensions, but got shape {img.shape}"
+    if img.ndim == 3:
+        assert img.shape[0] == 3, f"First dimension in a image array with shape {img.shape} must " \
+                                  f"be 3, but got {img.shape[0]}."
+    if img.ndim == 4:
+        assert img.shape[1] == 3, f"Second dimension in a image array with shape {img.shape} must " \
+                                  f"be 3, but got {img.shape[1]}."
+
+    img = make_np(img)
+
+    if full_batch:
+        img = img[None, ...] if img.ndim == 3 else img
+        imgs = []
+        for idx, ele in enumerate(img):
+            if batch_labels is not None:
+                assert "label" not in kwargs, "It is not possible to use batch_labels and label argument at the same time."
+                img_vis = _vis_single_image(ele, label=batch_labels[idx], **kwargs)
+            else:
+                img_vis = _vis_single_image(ele, **kwargs)
+            imgs.append(img_vis)
+
+        if full_batch == "rows":
+            return cat_images_rowwise(imgs)
+        else:
+            return cat_images_colwise(imgs)
+
+    else:
+        img = img[0] if img.ndim == 4 else img
+        return _vis_single_image(img, **kwargs)
+
+
+def _vis_single_image(img,
+                      clipping=False, upper_clipping_thresh=None, lower_clipping_thresh=None,
+                      mark_clipping=False, clipping_color=None,
+                      invalid_values=None, mark_invalid=False, invalid_color=None,
+                      text=None, label=None, image_range_text_off=False, image_range_colors_off=False, text_off=False,
+                      out_format=None, out_action=None):
+    """
+    Creates a visualization of a 2d numpy array or torch tensor.
+
+    Args:
+        img: 2D numpy array or torch tensor.
+        colorize: If set to true, the values will be visualized by a colormap, otherwise as gray-values.
+        clipping: If true, values above a certain threshold will be clipped before the visualization.
+        upper_clipping_thresh: Threshold that is used for clipping the values. If set to False,
+        the value mean + 2*std_deviation of the array will be used as threshold. The thresholds are also used
+        as limits of the color range.
+        lower_clipping_thresh: Threshold that is used for clipping the values. If set to False,
+        the value mean - 2*std_deviation of the array will be used as threshold. The thresholds are also used
+        as limits of the color range.
+        mark_clipping: Mark clipped values with specific colors in the visualization.
+        clipping_color: Color for marking clipped values.
+        invalid_values: list of values that are invalid (e.g. [0]). If no such values exist, just pass None.
+        mark_invalid: Mark invalid (NaN/Inf and all values in the invalid_values list) with
+        specific colors in the visualization.
+        invalid_color: Color for marking invalid values.
+        text: Additional text that is printed on the visualization.
+        cmap: Colormap to use for the visualization.
+        desc=description string, colors=dict with keys marker_color, text_color, bbox_color, bbox_stroke, score).
+        Everything except for coordinates can be None.
+        image_range_text_off: If True, no text information about the range of the image values is added.
+        text_off: If True, the provided text is not added to the image.
+        out_format: Dict that describes the format of the output. All such dicts must have 'type' and 'mode' key.
+        Currently supported are:
+        {'type': 'PIL', 'mode': 'RGB' (see PIL docs for supported modes)} (this is the default format),
+        {'type': 'np', 'mode': 'RGB' (see PIL docs for supported modes), 'dtype': 'uint8'}.
+        out_action: Dict that describes an action on the output. All such dicts must have 'type' key.
+        Note that some actions require a specific out_format.
+        Currently supported are:
+        None,
+        {'type': 'show'}.
+    """
+    assert img.ndim == 3, f"Single image array must have 3 dimension, but got shape {img.shape}"
+    img = make_np(img)
+
+    img = img.astype(np.float32, copy=True).transpose(1, 2, 0)
+    out_format = {'type': 'PIL', 'mode': 'RGB'} if out_format is None else out_format
+    out_format['mode'] = 'RGB' if 'mode' not in out_format else out_format['mode']
+
+    # Filter out all values that are somehow invalid and set them to 0:
+    img, invalid_mask, invalid_values_mask, clipping_mask, upper_clipping_mask, lower_clipping_mask, \
+    upper_clipping_thresh, lower_clipping_thresh = \
+        invalidate_np_array(img, clipping, upper_clipping_thresh, lower_clipping_thresh, invalid_values)
+
+    # Now work only with valid values of the array and make them visualizable (range 0, 256):
+    arr_valid_only = np.ma.masked_array(img, invalid_mask)
+
+    if not clipping:
+        min_value = arr_min = float(np.ma.min(arr_valid_only))
+        max_value = arr_max = float(np.ma.max(arr_valid_only))
+    else:
+        min_value = float(lower_clipping_thresh)
+        max_value = float(upper_clipping_thresh)
+        arr_min = float(np.ma.min(arr_valid_only))
+        arr_max = float(np.ma.max(arr_valid_only))
+
+    min_max_diff = max_value - min_value
+    is_constant = (max_value == min_value)
+
+    if is_constant:
+        if min_value == 0:  # array is constant 0
+            arr_valid_only *= 0
+        else:
+            arr_valid_only /= min_value
+            arr_valid_only *= 255.0
+    else:
+        arr_valid_only -= min_value
+        arr_valid_only /= min_max_diff
+        arr_valid_only *= 255.0
+
+    img = img.astype(np.uint8)
+
+    if mark_invalid:
+        invalid_color = np.array([0, 0, 0]) if invalid_color is None else invalid_color
+        img[np.any(invalid_values_mask, axis=2)] = invalid_color
+
+    if clipping:
+        if mark_clipping:
+            clipping_color = np.array([255, 255, 255]) if clipping_color is None else clipping_color
+            img[np.any(clipping_mask, axis=2)] = clipping_color
+        else:
+            min_color = np.array([min_value] * 3)
+            max_color = np.array([max_value] * 3)
+            img[np.any(upper_clipping_mask, axis=2)] = max_color
+            img[np.any(lower_clipping_mask, axis=2)] = min_color
+
+    img = _to_img(arr=img, mode=out_format['mode'])
+
+    image_range_text = "Image: Constant: %0.3f" % min_value if is_constant else "Min: %0.3f Max: %0.3f" % (
+            arr_min, arr_max)
+
+    draw_text = _get_draw_text(text, label, text_off, image_range_text, image_range_text_off)
     img = add_text_to_img(img=img, text=draw_text, xy_leftbottom=(5, 5))
 
     out = _convert_to_out_format(img, out_format)

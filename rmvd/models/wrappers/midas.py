@@ -72,7 +72,7 @@ class MiDaS_Wrapped(nn.Module):
         return to_numpy(pred), to_numpy(aux)
 
 
-@register_model
+@register_model(trainable=False)
 def midas_big_v2_1_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
     cfg = {"weights_name": "midas_v21-f6b98070.pt"}

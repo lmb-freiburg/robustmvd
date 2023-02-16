@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 
 from .registry import get_model
 from .helpers import add_run_function

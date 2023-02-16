@@ -5,10 +5,10 @@ set -e
 usage()
 {
    echo "Usage: $0 -o [OPTIONAL] out_base -n [OPTIONAL] num_samples -u [OPTIONAL] -g [OPTIONAL] gpu_list"
-   echo -e "\t-o Path to output base directory. Optional. Default: /tmp/eval_benchmark"
+   echo -e "\t-o Path to output base directory. Optional. Default: /tmp/rmvd_eval"
    echo -e "\t-n Number of samples to evaluate per dataset. Optional. Default: Evaluate all samples"
    echo -e "\t-u Evaluate Uncertainty. Default: Do not evaluate uncertainty"
-   echo -e "\t-g List of space-separated gpu numbers to launch train on (e.g. 0 2 4 5). Optional. Default: 1"
+   echo -e "\t-g List of space-separated gpu numbers to launch train on (e.g. 0 2 4 5). Optional. Default: 0"
    echo -e "\tNote: the order of the arguments is important"
    exit 1 # Exit program after printing help
 }
@@ -32,7 +32,7 @@ while getopts "o:n:ug" opt; do
 done
 
 if [ -z ${OUT_BASE} ]; then
-    OUT_BASE=/tmp/eval_benchmark
+    OUT_BASE=/tmp/rmvd_eval
 fi
 echo Output base directory: ${OUT_BASE}
 

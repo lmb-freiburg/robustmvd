@@ -6,4 +6,6 @@ from .data import list_datasets, list_base_datasets, list_dataset_types, list_sp
 from .models import list_models, has_model, create_model, prepare_custom_model
 from .eval import list_evaluations, create_evaluation
 from .train import list_trainings, create_training
+from .optim import list_optimizers, create_optimizer, list_schedulers, create_scheduler
+from .loss import list_losses, create_loss
 from .viewer import run_viewer

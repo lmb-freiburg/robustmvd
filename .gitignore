@@ -1,3 +1,5 @@
+rmvd/data/sample_lists/flyingthings3d.seq4_train.mvd.pickle
+rmvd/data/sample_lists/blendedmvs.seq4_train.mvd.pickle
 *.egg-info/
 *.pyc
 /.idea/

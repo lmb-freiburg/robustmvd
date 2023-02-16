@@ -26,11 +26,13 @@ def eval(args):
             print(f"No dataset specified. Available datasets are: {', '.join(datasets)}")
             return
 
+        print()
         print(f"Evaluating {args.model} model on dataset {args.dataset} in the {args.eval_type} evaluation setting.\n")
         dataset = create_dataset(dataset_name_or_path=args.dataset, dataset_type=args.eval_type,
                                  input_size=args.input_size)
 
     else:
+        print()
         print(f"Evaluating {args.model} model on the Robust Multi-view Depth Benchmark.\n")
         dataset = None
 
