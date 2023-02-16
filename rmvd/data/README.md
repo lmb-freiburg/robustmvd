@@ -33,38 +33,38 @@ Then specify the download directory `/path/to/eth3d` in the `paths.toml` file.
 Download the KITTI raw data from <https://www.cvlibs.net/datasets/kitti/raw_data.php> using
 the "raw dataset download script (1 MB)" that is provided on the website. You need to register for this, 
 therefore we can't provide a download script here. Move the "raw dataset download script" called
-`raw_data_downloader.sh` to a directory `/path/to/KITTI/raw_data` and execute it there.
+`raw_data_downloader.sh` to a directory `/path/to/kitti/raw_data` and execute it there.
 
 Download the file "annotated depth maps data set (14 GB)" from 
 <https://www.cvlibs.net/datasets/kitti/eval_depth_all.php>. Move it to a directory 
-`/path/to/KITTI/depth_completion_prediction/` and extract it there. The `data_depth_annotated.zip` file can be deleted.
+`/path/to/kitti/depth_completion_prediction/` and extract it there. The `data_depth_annotated.zip` file can be deleted.
 
-Then specify the KITTI directory `/path/to/KITTI` in the `paths.toml` file.
+Then specify the KITTI directory `/path/to/kitti` in the `paths.toml` file.
 
 ### DTU
 
 From the directory of this `README` file, execute the script `scripts/download_dtu.sh` and 
 specify the download directory for the dataset:
 ```bash
-./scripts/download_dtu.sh /path/to/DTU_raw
+./scripts/download_dtu.sh /path/to/dtu_raw
 ```
 
 Then, from the directory of this `README` file, execute the script `scripts/convert_dtu.sh` to bring the dataset in the
 structure that is required by the dataloader:
 ```bash
-./scripts/convert_dtu.py /path/to/DTU_raw /path/to/DTU
+./scripts/convert_dtu.py /path/to/dtu_raw /path/to/dtu
 ```
 
-Then specify the DTU directory (`/path/to/DTU`) in the `paths.toml` file. 
-The directory `/path/to/DTU_raw` can be deleted.
+Then specify the DTU directory (`/path/to/dtu`) in the `paths.toml` file. 
+The directory `/path/to/dtu_raw` can be deleted.
 
 ### ScanNet
 Download ScanNet by following the official instructions at <https://github.com/ScanNet/ScanNet>. 
 You need to fill out a Terms of Use agreement for this, therefore we can't provide a download script here. 
 You will receive a script named `download-scannet.py` to download the data. 
-Download the full dataset to a directory `/path/to/ScanNet_orig` with this script as follows:
+Download the full dataset to a directory `/path/to/scannet_orig` with this script as follows:
 ```bash
-python download-scannet.py -o /path/to/ScanNet_orig/
+python download-scannet.py -o /path/to/scannet_orig/
 ```
 
 Then create a new python2.7 virtual environment, e.g. via:
@@ -77,11 +77,11 @@ conda install -y numpy imageio=2.6.0 opencv tqdm
 Then, from the directory of this `README` file, execute the script `scripts/convert_scannet.sh` to bring the dataset in 
 the structure that is required by the dataloader:
 ```bash
-./scripts/convert_scannet.py /path/to/ScanNet_orig /path/to/ScanNet
+./scripts/convert_scannet.py /path/to/scannet_orig /path/to/scannet
 ```
 
-Then specify the ScanNet directory (`/path/to/ScanNet`) in the `paths.toml` file. 
-The directory `/path/to/ScanNet_orig` can be deleted. The virtual environment `scannetreader` can be deleted.
+Then specify the ScanNet directory (`/path/to/scannet`) in the `paths.toml` file. 
+The directory `/path/to/scannet_orig` can be deleted. The virtual environment `scannetreader` can be deleted.
 
 ### Tanks and Temples
 From the directory of this `README` file, execute the script `scripts/download_tanks_and_temples.sh` and specify the 
@@ -90,6 +90,33 @@ download target directory to download the dataset:
 ./scripts/download_tanks_and_temples.sh /path/to/tanks_and_temples
 ```
 Then specify the download directory (`/path/to/tanks_and_temples`) in the `paths.toml` file.
+
+### FlyingThings3D
+Download FlyingThings3D from 
+[the dataset website](https://lmb.informatik.uni-freiburg.de/resources/datasets/SceneFlowDatasets.en.html). You 
+need the following files:
+- RGB images (cleanpass) from the "full dataset"
+- Disparity from the "full dataset"
+- Camera data from the "full dataset"
+
+Extract all downloaded files in the same directory, e.g. `/path/to/flyingthings3d`. The dataloader requires a different
+storage structure than the original dataset. Execute the script `scripts/convert_flyingthings3d.py` to create the 
+required storage structure in a directory called `/path/to/flyingthings3d_converted`:
+```bash
+./scripts/convert_flyingthings3d.py /path/to/flyingthings3d /path/to/flyingthings3d_converted
+```
+
+Note that the script partially creates links in the `/path/to/FlyingThings3D_converted` directory, instead of
+copying the actual files.
+
+Then specify the converted directory (`/path/to/FlyingThings3D_converted`) in the `paths.toml` file.
+
+### BlendedMVS
+Download the BlendedMVS low-res set (27.5GB) from https://github.com/YoYo000/BlendedMVS. Extract the files to a
+directory `/path/to/blendedmvs` (the directory should then contain the scene folders, e.g. 
+`/path/to/blendedmvs/57f8d9bbe73f6760f10e916a`) and specify the 
+directory (`/path/to/blendedmvs`) in the `paths.toml` file.
+
 
 ---
 

@@ -5,7 +5,8 @@ import numpy as np
 from PIL import Image
 
 from .dataset import Dataset, Sample
-from .registry import register_dataset, register_default_dataset
+from .registry import register_default_dataset
+from .layouts import MVDUnstructuredDefaultLayout, AllImagesLayout
 
 
 def readPFM(file):
@@ -54,7 +55,7 @@ def load_depth(root, cam, frame_num):
     filename = '{:04d}.pfm'.format(frame_num)
     cam = 'left' if cam == 'l' else 'right'
     disparity = readPFM(osp.join(root, "disparities", cam, filename))
-    depth = 1050./disparity
+    depth = 1050./(-1*disparity)
     depth[(depth < 0.) | np.isinf(depth) | np.isnan(depth)] = 0.
     depth = np.expand_dims(depth, 0)  # 1HW
     return depth
@@ -118,9 +119,16 @@ class FlyingThings3DSeq4Train(Dataset):
     dataset_type = 'mvd'
 
     # TODO: create sample_list on the fly instead of loading from file?
-    def __init__(self, root=None, **kwargs):
+    def __init__(self, root=None, layouts=None, **kwargs):
         root = root if root is not None else osp.join(self._get_path("flyingthings3d", "root"), "TRAIN")
-        super().__init__(root=root, **kwargs)
+
+        default_layouts = [
+            MVDUnstructuredDefaultLayout("default", num_views=5, max_views=5),
+            AllImagesLayout("all_images", num_views=5),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)
 
 
 

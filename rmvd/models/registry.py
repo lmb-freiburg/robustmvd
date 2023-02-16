@@ -7,7 +7,7 @@ Based on the model registry from the timm package ( https://github.com/rwightman
 _model_entrypoints = {}
 
 
-def register_model(model_entrypoint):
+def register_model(model_entrypoint, trainable=True):
     """Register a model."""
     model_name = model_entrypoint.__name__
     _model_entrypoints[model_name] = model_entrypoint

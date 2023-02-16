@@ -1,5 +1,5 @@
 # Robust Multi-view Depth
-[**Paper**](http://arxiv.org/abs/2209.06681) | Video (Coming soon) | Project page (Coming soon)
+[**Paper**](http://arxiv.org/abs/2209.06681)
 
 **Robust** **M**ulti-**v**iew **D**epth (`robustmvd`) is a benchmark and framework for depth estimation 
 from multiple input views with a focus on robust application independent of the target data. 

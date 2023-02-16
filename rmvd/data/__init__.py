@@ -7,5 +7,5 @@ from .kitti import KITTIRobustMVD
 from .dtu import DTURobustMVD
 from .scannet import ScanNetRobustMVD
 from .tanks_and_temples import TanksAndTemplesTrainRobustMVD
-# from .flyingthings3d import FlyingThings3DSeq4Train
-# from .blendedmvs import BlendedMVSSeq4Train
+from .flyingthings3d import FlyingThings3DSeq4Train
+from .blendedmvs import BlendedMVSSeq4Train
