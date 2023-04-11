@@ -17,7 +17,6 @@ from rmvd.utils import (
     select_by_index,
     exclude_index,
 )
-from rmvd.data.transforms import Resize
 
 
 class PatchmatchNet_Wrapped(nn.Module):

@@ -6,7 +6,6 @@ from .utils import m_univariate_laplace_nll, pointwise_univariate_laplace_nll, m
 from .registry import register_loss
 
 
-@register_loss
 class MultiScaleUniLaplace(nn.Module):
     def __init__(self, model, weight_decay=1e-4, gt_interpolation="nearest", modality="invdepth", verbose=True,
                  deterministic_loss_iterations=2000):
@@ -105,4 +104,7 @@ class MultiScaleUniLaplace(nn.Module):
         sub_losses["01_reg"] = total_reg_loss
         return total_loss, sub_losses, pointwise_losses
 
-# TODO: create factory function and register it instead of the class; then change train_all.sh
+
+@register_loss
+def robust_mvd_loss(**kwargs):
+    return MultiScaleUniLaplace(weight_decay=1e-4, gt_interpolation="nearest", modality="invdepth", deterministic_loss_iterations=2000, **kwargs)

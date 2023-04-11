@@ -112,9 +112,9 @@ copying the actual files.
 Then specify the converted directory (`/path/to/FlyingThings3D_converted`) in the `paths.toml` file.
 
 ### BlendedMVS
-Download the BlendedMVS low-res set (27.5GB) from https://github.com/YoYo000/BlendedMVS. Extract the files to a
-directory `/path/to/blendedmvs` (the directory should then contain the scene folders, e.g. 
-`/path/to/blendedmvs/57f8d9bbe73f6760f10e916a`) and specify the 
+Download the BlendedMVS low-res set (27.5GB) from https://github.com/YoYo000/BlendedMVS (we do not provide a download script,
+as the data is hosted on OneDrive). Extract the files to a directory `/path/to/blendedmvs` (the directory should then contain 
+the scene folders, e.g. `/path/to/blendedmvs/57f8d9bbe73f6760f10e916a`) and specify the 
 directory (`/path/to/blendedmvs`) in the `paths.toml` file.
 
 
@@ -229,8 +229,8 @@ A dataset can be created with the parameter `to_torch=True`, e.g. `create_datase
 case, samples will be converted to torch format, i.e. as torch tensors and not numpy arrays and with a prepended 
 batch dimension.
 
-#### `aug_fcts` parameter
-A dataset can be created with the parameter `aug_fcts=[your_aug_1, your_aug_2]`. The specified augmentation functions
+#### `augmentations` parameter
+A dataset can be created with the parameter `augmentations=[augmentation_1, augmentation_2, ..]`. The specified augmentations
 will be applied to all loaded samples.
 
 #### `input_size` parameter

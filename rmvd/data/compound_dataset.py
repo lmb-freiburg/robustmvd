@@ -10,6 +10,7 @@ class CompoundDataset(torch.utils.data.Dataset):
         self.dataset_start_indices = [0] + list(np.cumsum(self.dataset_lens))[:-1]
         self.common_keys = common_keys
 
+    @property
     def name(self):
         return "+".join([dataset.name for dataset in self.datasets])
 

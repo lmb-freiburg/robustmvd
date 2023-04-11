@@ -6,6 +6,7 @@ import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
+from rmvd import create_augmentation
 from rmvd.utils import TrainStateSaver, WeightsOnlySaver, to_torch, get_torch_model_device, \
     count_torch_model_parameters, writer, select_by_index, exclude_index
 
@@ -29,12 +30,14 @@ class MultiViewDepthTraining:
         inputs: List of input modalities that are supplied to the model.
             Can include: ["images", "intrinsics", "poses", "depth_range"].
             Default: ["images", "intrinsics", "poses"].
+        batch_augmentations: List of augmentations to apply to each batch jointly. Default: do not apply any batch augmentations.
         alignment: Alignment between predicted and ground truth depths. Options are None, "median",
             "least_squares_scale_shift".
             None evaluates predictions without any alignment.
             "median" scales predicted depth maps with the ratio of medians of predicted and ground truth depth maps.
             "least_squares_scale_shift" scales and shifts predicted depth maps such that the least-squared error to the
             ground truth is minimal.
+        grad_clip_max_norm: Maximum norm for gradient clipping. Default: None.
         num_workers: Number of workers for the dataloader. Default: 8.
         print_interval: Interval for printing training state. Default: 100.
         log_loss_interval: Interval for logging loss. Default: 1 iteration.
@@ -56,7 +59,9 @@ class MultiViewDepthTraining:
                  batch_size: int,
                  max_iterations: int,
                  inputs: Sequence[str] = None,
+                 batch_augmentations: Optional[Sequence[str]] = None,
                  alignment: Optional[str] = None,
+                 grad_clip_max_norm: Optional[float] = None,
                  num_workers: Optional[int] = 8,
                  print_interval: Optional[int] = 100,
                  log_loss_interval: Optional[int] = 1,
@@ -87,6 +92,7 @@ class MultiViewDepthTraining:
         self.scheduler = scheduler
         self.loss = loss
         self.batch_size = batch_size
+        self.grad_clip_max_norm = grad_clip_max_norm
         self.dataloader = self.dataset.get_loader(batch_size=batch_size, shuffle=True, pin_memory=True,
                                                   num_workers=num_workers, drop_last=True)
 
@@ -100,7 +106,14 @@ class MultiViewDepthTraining:
         self._start_iteration = self.finished_iterations
 
         self.inputs = list(set(inputs + ["images"])) if inputs is not None else ["images", "intrinsics", "poses"]
+        
+        batch_augmentations = [] if batch_augmentations is None else batch_augmentations
+        batch_augmentations = [batch_augmentations] if not isinstance(batch_augmentations, list) else batch_augmentations
+        self.batch_augmentations = []
+        self._init_batch_augmentations(batch_augmentations)
+        
         self.alignment = alignment
+        assert self.alignment is None, "Alignment is not yet implemented."
 
         self.log_full_batch = log_full_batch
         writer.setup_writers(log_tensorboard=log_tensorboard, log_wandb=log_wandb, max_iterations=self.max_iterations,
@@ -129,6 +142,7 @@ class MultiViewDepthTraining:
         ret += f"\n\tDataset size: {len(self.dataset)}"
         ret += f"\n\tOptimizer: {self.optimizer.name}"
         ret += f"\n\tScheduler: {self.scheduler.name}"
+        ret += f"\n\tGrad clip max norm: {self.grad_clip_max_norm}"
         ret += f"\n\tLoss: {self.loss.name}"
         ret += f"\n\tBatch size: {self.batch_size}"
         ret += f"\n\tInputs: {self.inputs}"
@@ -153,6 +167,12 @@ class MultiViewDepthTraining:
         os.makedirs(self.weights_only_checkpoints_dir, exist_ok=True)
 
         # TODO: log.add_log_file(self.log_file_path, flush_line=True)
+
+    def _init_batch_augmentations(self, batch_augmentations):
+        for batch_augmentation in batch_augmentations:
+            if isinstance(batch_augmentation, str):
+                batch_augmentation = create_augmentation(batch_augmentation)
+            self.batch_augmentations.append(batch_augmentation)
 
     def __call__(self):
         """Run training."""
@@ -181,6 +201,8 @@ class MultiViewDepthTraining:
                 with writer.TimeWriter(name="00_overview/train_sec_iter", step=self.finished_iterations, write=should_log_loss(), avg_over_steps=True, update_eta=True):
                     self.optimizer.zero_grad()
 
+                    for batch_augmentation in self.batch_augmentations:
+                        batch_augmentation(sample)
                     sample = to_torch(sample, device=get_torch_model_device(self.model))
                     sample_inputs, sample_gt = self._inputs_and_gt_from_sample(sample)
 
@@ -189,8 +211,8 @@ class MultiViewDepthTraining:
                     loss, sub_losses, pointwise_losses = self.loss(sample_inputs=sample_inputs, sample_gt=sample_gt,
                                                                    pred=pred, aux=aux, iteration=self.finished_iterations)
                     loss.backward()
-                    # TODO: optional gradient clipping;
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), 5) #; grad_clip=5
+                    if self.grad_clip_max_norm is not None:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip_max_norm)
 
                     self.optimizer.step()
                     self.scheduler.step()

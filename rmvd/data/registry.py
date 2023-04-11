@@ -7,6 +7,7 @@ Based on the model registry from the timm package ( https://github.com/rwightman
 
 _datasets = {}  # keys are (base_dataset, dataset_type, split)
 _default_splits = {}
+_aug_fcts = {}
 
 
 def register_dataset(dataset_cls):
@@ -163,3 +164,22 @@ def get_dataset(dataset_name, dataset_type=None, split=None):
     # TODO: add assert that dataset is registered
 
     return _datasets[(base_dataset, dataset_type, split)]
+
+def register_augmentation(augmentation_factory):
+    """Register augmentation by name."""
+    aug_fct_name = augmentation_factory.__name__
+    _aug_fcts[aug_fct_name] = augmentation_factory
+    return augmentation_factory
+
+def list_augmentations():
+    """Get list of all augmentations."""
+    return list(sorted(_aug_fcts.keys()))
+
+def has_augmentation(augmentation_name):
+    """Check if augmentation is registered."""
+    return augmentation_name in _aug_fcts
+
+def create_augmentation(augmentation_name, **kwargs):
+    """Get augmentation by name."""
+    assert has_augmentation(augmentation_name), f'The requested augmentation function "{augmentation_name}" does not exist. Available augmentation functions are: {" ".join(list_augmentations())}'
+    return _aug_fcts[augmentation_name](**kwargs)

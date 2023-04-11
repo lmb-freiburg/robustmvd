@@ -17,7 +17,7 @@ from rmvd.utils import (
     select_by_index,
     exclude_index,
 )
-from rmvd.data.transforms import Resize
+from rmvd.data.transforms import ResizeInputs
 
 
 class CVPMVSNet_Wrapped(nn.Module):
@@ -55,7 +55,7 @@ class CVPMVSNet_Wrapped(nn.Module):
             math.ceil(orig_wd / 64.0) * 64.0
         )
         if (orig_ht != ht) or (orig_wd != wd):
-            resized = Resize(size=(ht, wd))(
+            resized = ResizeInputs(size=(ht, wd))(
                 {"images": images, "intrinsics": intrinsics}
             )
             images = resized["images"]

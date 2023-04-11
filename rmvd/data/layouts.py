@@ -3,6 +3,7 @@ import math
 import numpy as np
 
 from .layout import Layout, Visualization
+from rmvd.utils import vis
 
 
 class MVDSequentialDefaultLayout(Layout):
@@ -16,7 +17,9 @@ class MVDSequentialDefaultLayout(Layout):
 
         def load_key_img(sample_dict):
             from itypes.vizdata.image import ImageVisualizationData
-            key_img = sample_dict['images'][sample_dict['keyview_idx']].transpose(1, 2, 0).astype(np.uint8)
+            key_img = sample_dict['images'][sample_dict['keyview_idx']]
+            key_img = vis(key_img, out_format={'type': 'np'}, image_range_text_off=True)
+            key_img = key_img.transpose(1, 2, 0).astype(np.uint8)
             key_img = ImageVisualizationData(key_img)
             return {'data': key_img}
 
@@ -53,7 +56,9 @@ class MVDSequentialDefaultLayout(Layout):
         for i in list(range(-max_bwd, 0)) + list(range(1, 1+max_fwd)):
             def load_source_img(sample_dict, idx=i):
                 from itypes.vizdata.image import ImageVisualizationData
-                source_img = sample_dict['images'][sample_dict['keyview_idx'] + idx].transpose(1, 2, 0).astype(np.uint8)
+                source_img = sample_dict['images'][sample_dict['keyview_idx'] + idx]
+                source_img = vis(source_img, out_format={'type': 'np'}, image_range_text_off=True)
+                source_img = source_img.transpose(1, 2, 0).astype(np.uint8)
                 source_img = ImageVisualizationData(source_img)
                 return {'data': source_img}
 
@@ -75,7 +80,9 @@ class MVDUnstructuredDefaultLayout(Layout):
 
         def load_key_img(sample_dict):
             from itypes.vizdata.image import ImageVisualizationData
-            key_img = sample_dict['images'][sample_dict['keyview_idx']].transpose(1, 2, 0).astype(np.uint8)
+            key_img = sample_dict['images'][sample_dict['keyview_idx']]
+            key_img = vis(key_img, out_format={'type': 'np'}, image_range_text_off=True)
+            key_img = key_img.transpose(1, 2, 0).astype(np.uint8)
             key_img = ImageVisualizationData(key_img)
             return {'data': key_img}
 
@@ -114,7 +121,9 @@ class MVDUnstructuredDefaultLayout(Layout):
                 from itypes.vizdata.image import ImageVisualizationData
                 key_idx = sample_dict['keyview_idx']
                 assert key_idx == 0, "This layout only works with samples where keyview_idx=0"
-                source_img = sample_dict['images'][key_idx+idx].transpose(1, 2, 0).astype(np.uint8)
+                source_img = sample_dict['images'][key_idx+idx]
+                source_img = vis(source_img, out_format={'type': 'np'}, image_range_text_off=True)
+                source_img = source_img.transpose(1, 2, 0).astype(np.uint8)
                 source_img = ImageVisualizationData(source_img)
                 return {'data': source_img}
 
@@ -135,7 +144,9 @@ class AllImagesLayout(Layout):
 
         def load_key_img(sample_dict):
             from itypes.vizdata.image import ImageVisualizationData
-            key_img = sample_dict['images'][sample_dict['keyview_idx']].transpose(1, 2, 0).astype(np.uint8)
+            key_img = sample_dict['images'][sample_dict['keyview_idx']]
+            key_img = vis(key_img, out_format={'type': 'np'}, image_range_text_off=True)
+            key_img = key_img.transpose(1, 2, 0).astype(np.uint8)
             key_img = ImageVisualizationData(key_img)
             return {'data': key_img}
 
@@ -147,7 +158,9 @@ class AllImagesLayout(Layout):
                 from itypes.vizdata.image import ImageVisualizationData
                 key_idx = sample_dict['keyview_idx']
                 src_idx = idx if idx < key_idx else idx + 1
-                source_img = sample_dict['images'][src_idx].transpose(1, 2, 0).astype(np.uint8)
+                source_img = sample_dict['images'][src_idx]
+                source_img = vis(source_img, out_format={'type': 'np'}, image_range_text_off=True)
+                source_img = source_img.transpose(1, 2, 0).astype(np.uint8)
                 source_img = ImageVisualizationData(source_img)
                 return {'data': source_img}
 

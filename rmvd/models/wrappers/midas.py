@@ -61,15 +61,17 @@ class MiDaS_Wrapped(nn.Module):
 
     def forward(self, image, **_):
         pred_invdepth = self.model(image)
-        pred_depth = 1 / (pred_invdepth + 1e-9)
-        pred_depth = pred_depth.unsqueeze(1)
+        return pred_invdepth
+
+    def output_adapter(self, model_output):
+        pred_invdepth = model_output
+        pred_invdepth = to_numpy(pred_invdepth)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            pred_depth = 1 / pred_invdepth
+        pred_depth = pred_depth[:, None]
         pred = {'depth': pred_depth}
         aux = {}
         return pred, aux
-
-    def output_adapter(self, model_output):
-        pred, aux = model_output
-        return to_numpy(pred), to_numpy(aux)
 
 
 @register_model(trainable=False)

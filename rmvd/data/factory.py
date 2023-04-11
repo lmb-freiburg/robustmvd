@@ -25,6 +25,8 @@ def create_dataset(dataset_name_or_path, dataset_type=None, split=None, **kwargs
         return _create_dataset_from_registry(dataset_name=dataset_name_or_path, dataset_type=dataset_type,
                                              split=split, **kwargs)
     else:
+        if len(kwargs) > 0:
+            print(f"Warning: arguments {', '.join(kwargs.keys())} were ignored when creating the dataset {dataset_name_or_path}.")
         return _create_dataset_from_cfg(path=dataset_name_or_path)
 
 

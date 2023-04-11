@@ -14,7 +14,7 @@ from .blocks.dispnet_costvolume_encoder import DispnetCostvolumeEncoder
 from .blocks.dispnet_decoder import DispnetDecoder
 
 from rmvd.utils import get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
-from rmvd.data.transforms import Resize
+from rmvd.data.transforms import ResizeInputs
 
 
 class RobustMVD(nn.Module):
@@ -83,7 +83,7 @@ class RobustMVD(nn.Module):
         orig_ht, orig_wd = images[0].shape[-2:]
         ht, wd = int(math.ceil(orig_ht / 64.0) * 64.0), int(math.ceil(orig_wd / 64.0) * 64.0)
         if (orig_ht != ht) or (orig_wd != wd):
-            resized = Resize(size=(ht, wd))({'images': images, 'intrinsics': intrinsics})
+            resized = ResizeInputs(size=(ht, wd))({'images': images, 'intrinsics': intrinsics})
             images = resized['images']
             intrinsics = resized['intrinsics']
 

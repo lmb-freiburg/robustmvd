@@ -9,9 +9,10 @@ import numpy as np
 import pytoml
 
 import rmvd.utils as utils
-from .transforms import Resize
+from .transforms import ResizeInputs, ResizeTargets
 from .updates import Updates, PickledUpdates
 from .layout import Layout
+from .registry import create_augmentation
 
 
 class Sample(metaclass=abc.ABCMeta):
@@ -23,11 +24,11 @@ class Sample(metaclass=abc.ABCMeta):
 
 class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
 
-    def __init__(self, root, aug_fcts=None, input_size=None, to_torch=False, updates=None, update_strict=False,
+    def __init__(self, root, augmentations=None, input_size=None, target_size=None, to_torch=False, updates=None, update_strict=False,
                  layouts=None, verbose=True, **kwargs):
 
-        aug_fcts = [] if aug_fcts is None else aug_fcts
-        aug_fcts = [aug_fcts] if not isinstance(aug_fcts, list) else aug_fcts
+        augmentations = [] if augmentations is None else augmentations
+        augmentations = [augmentations] if not isinstance(augmentations, list) else augmentations
         self.verbose = verbose
 
         self.root = None
@@ -37,9 +38,10 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
             print(f"Initializing dataset {self.name} from {self.root}")
 
         self._seed_initialized = False
-        self.resize = Resize(size=input_size) if (input_size is not None and input_size[0] is not None and input_size[1] is not None) else None  # TODO: handle case where input_size is scaler; move this to input_size setter
-        self.aug_fcts = []
-        self._init_aug_fcts(aug_fcts)
+        self.input_resize = ResizeInputs(size=input_size) if input_size is not None else None
+        self.target_resize = ResizeTargets(size=target_size) if target_size is not None else None
+        self.augmentations = []
+        self._init_augmentations(augmentations)
         self.to_torch = to_torch
 
         self.samples = []
@@ -54,8 +56,10 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
             print(f"\tNumber of samples: {len(self)}")
             if len(self.updates) > 0:
                 print(f"\tUpdates: {', '.join([update.name for update in self.updates])}")
-            if self.resize is not None:
+            if self.input_resize is not None:
                 print(f"\tImage resolution (height, width): ({input_size[0]}, {input_size[1]})")
+            if self.target_resize is not None:
+                print(f"\Target resolution (height, width): ({target_size[0]}, {target_size[1]})")
             print(f"Finished initializing dataset {self.name}.")
             print()
 
@@ -82,12 +86,11 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         elif isinstance(root, list):
             self.root = [path for path in root if osp.isdir(path)][0]
 
-    def _init_aug_fcts(self, aug_fcts):
-        for aug_fct in aug_fcts:
-            if isinstance(aug_fct, str):
-                aug_fct_class = utils.get_function(aug_fct)
-                aug_fct = aug_fct_class()
-            self.aug_fcts.append(aug_fct)
+    def _init_augmentations(self, augmentations):
+        for augmentation in augmentations:
+            if isinstance(augmentation, str):
+                augmentation = create_augmentation(augmentation)
+            self.augmentations.append(augmentation)
 
     def _init_samples(self):
         self._init_samples_from_list()
@@ -95,9 +98,19 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
     def _init_samples_from_list(self):
         sample_list_path = _get_sample_list_path(self.name)
         if self.verbose:
-            print("\tInitializing samples from list at {}.".format(sample_list_path))
+            print("\tInitializing samples from list at {}".format(sample_list_path))
         with open(sample_list_path, 'rb') as sample_list:
             self.samples = pickle.load(sample_list)
+
+    def _write_samples_list(self, path=None):
+        path = _get_sample_list_path(self.name) if path is None else path
+        if osp.isdir(osp.split(path)[0]):
+            if self.verbose:
+                print(f"Writing sample list to {path}")
+            with open(path, 'wb') as file:
+                pickle.dump(self.samples, file)
+        elif self.verbose:
+            print(f"Could not write sample list to {path}")
 
     def _init_updates(self, updates, update_strict=False):
 
@@ -155,11 +168,13 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         for update in self.updates:
             update.apply_update(sample_dict, index=index)
 
-        for aug_fct in self.aug_fcts:
-            aug_fct(sample_dict)
+        for augmentation in self.augmentations:
+            augmentation(sample_dict)
 
-        if self.resize is not None:
-            self.resize(sample_dict)
+        if self.input_resize is not None:
+            self.input_resize(sample_dict)
+        if self.target_resize is not None:
+            self.target_resize(sample_dict)
 
         if self.to_torch:
             sample_dict = utils.torch_collate([sample_dict])
@@ -207,11 +222,11 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         print("Mean time per batch: %1.4fs." % ((end - start)/num_batches))
 
     @classmethod
-    def write_config(cls, path, dataset_cls_name, aug_fcts=None, input_size=None, to_torch=False, updates=None,
+    def write_config(cls, path, dataset_cls_name, augmentations=None, input_size=None, to_torch=False, updates=None,
                      update_strict=False, layouts=None):
 
         config = {'dataset_cls_name': dataset_cls_name,
-                  'aug_fcts': aug_fcts,
+                  'augmentations': augmentations,
                   'input_size': input_size,
                   'to_torch': to_torch,
                   'updates': updates,
@@ -289,13 +304,7 @@ def _preprocess_sample(sample):
         sample['depth'] = np.nan_to_num(1 / sample['invdepth'], copy=False, nan=0, posinf=0, neginf=0)
 
     if 'depth_range' not in sample:
-        mask = sample['depth'] > 0
-        if mask.any():
-            min_depth = np.min(sample['depth'][mask])
-            max_depth = np.max(sample['depth'][mask])
-            sample['depth_range'] = (min_depth, max_depth)
-        else:
-            sample['depth_range'] = (0.1, 100.)
+        sample['depth_range'] = utils.compute_depth_range(depth=sample['depth'])
 
     key_idx = sample['keyview_idx'] if 'keyview_idx' in sample else 0
     key_to_ref_transform = sample['poses'][key_idx]

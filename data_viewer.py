@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
-from rmvd import list_datasets, create_dataset, run_viewer
+from rmvd import list_datasets, create_dataset, run_viewer, list_augmentations
 
 
 def data_viewer(args):
-    dataset = create_dataset(args.data)
+    dataset = create_dataset(args.data, augmentations=args.augmentations)
 
     if args.layout is None:
         layout_names = dataset.get_layout_names()
@@ -24,5 +24,7 @@ if __name__ == "__main__":
     parser.add_argument('data', help=f"Data to be viewed. Can either be a path to evaluation outputs, or a dataset"
                                      f"name. Available dataset names are: {', '.join(list_datasets())}")
     parser.add_argument('--layout', help=f"Data viewer layout. If not specified, the default layout is used.")
+    parser.add_argument('--augmentations', nargs='*',
+                        help=f"Data augmentations. Options are: {', '.join(list_augmentations())}")
     args = parser.parse_args()
     data_viewer(args)

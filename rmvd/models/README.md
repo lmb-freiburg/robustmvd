@@ -186,8 +186,7 @@ model = create_model(model_name, pretrained=True, weights=None, train=False, num
 
 #### Weights
 
-If `pretrained` is set to True, the default pretrained weights for the model will be used. The default weights
-are automatically downloaded at first use. 
+If `pretrained` is set to True, the default pretrained weights for the model will be used. 
 Alternatively, custom weights can be loaded by providing the path to the weights with the `weights` parameter.
 
 #### Train mode
@@ -281,7 +280,8 @@ normalizing the images, etc.
 The `forward` function of each model expects data in the model-specific format and returns model-specific outputs.
 
 Hence, in case all input data is already in the format required by the model, you can also do `model(**sample)`. 
-This is used in the `rmvd` training code. 
+This is used in the `rmvd` training code. Note that the `forward` function also expects input data to have a resolution
+that is supported by the model.
 
 ### The `output_adapter` function
 The `output_adapter` function has the following interface:

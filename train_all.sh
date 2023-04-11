@@ -42,4 +42,4 @@ export CUDA_VISIBLE_DEVICES=${GPU_IDX_STR}
 echo
 
 # robust_mvd model:
-python train.py --training_type mvd --output ${OUT_BASE}/robust_mvd --num_gpus ${NUM_GPUS} --batch_size 4 --max_iterations 600000 --model robust_mvd --inputs poses intrinsics --optimizer adam --lr 1e-4 --scheduler flownet_scheduler --loss MultiScaleUniLaplace --dataset flyingthings3d.seq4_train.mvd --input_size 384 768
+python train.py --training_type mvd --output ${OUT_BASE}/robust_mvd --num_gpus ${NUM_GPUS} --batch_size 4 --max_iterations 600000 --model robust_mvd --inputs poses intrinsics --optimizer adam --lr 1e-4 --grad_clip_max_norm 5 --scheduler flownet_scheduler --loss robust_mvd_loss --dataset staticthings3d.seq4_train.mvd --augmentations robust_mvd_augmentations
