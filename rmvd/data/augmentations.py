@@ -1,6 +1,7 @@
 import torchvision.transforms
 from .registry import register_augmentation
-from .transforms import ResizeInputs, ResizeTargets, ColorJitter, Eraser, Scale3DFixed, NormalizeImagesToMinMax, MaskDepth, SpatialAugmentation, NormalizeIntrinsics
+from .transforms import ResizeInputs, ResizeTargets, ColorJitter, Eraser, NormalizeImagesToMinMax, MaskDepth, SpatialAugmentation, NormalizeIntrinsics
+
 
 @register_augmentation
 def robust_mvd_augmentations_staticthings3d(**kwargs):
@@ -14,6 +15,7 @@ def robust_mvd_augmentations_staticthings3d(**kwargs):
     ]
     transform = torchvision.transforms.Compose(transforms)
     return transform
+
 
 @register_augmentation
 def robust_mvd_augmentations_blendedmvs(**kwargs):

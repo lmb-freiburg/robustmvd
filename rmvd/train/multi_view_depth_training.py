@@ -6,7 +6,7 @@ import time
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from rmvd import create_augmentation
+from rmvd import create_batch_augmentation
 from rmvd.utils import TrainStateSaver, WeightsOnlySaver, to_torch, get_torch_model_device, \
     count_torch_model_parameters, writer, select_by_index, exclude_index
 
@@ -40,7 +40,7 @@ class MultiViewDepthTraining:
         grad_clip_max_norm: Maximum norm for gradient clipping. Default: None.
         num_workers: Number of workers for the dataloader. Default: 8.
         print_interval: Interval for printing training state. Default: 100.
-        log_loss_interval: Interval for logging loss. Default: 1 iteration.
+        log_loss_interval: Interval for logging loss. Default: 100 iterations.
         log_interval: Interval for logging training state. Default: 5000 iterations.
         save_checkpoint_interval_min: Interval in minutes for saving checkpoints. Default: 20 minutes.
         log_tensorboard: Whether to log to tensorboard. Default: True.
@@ -64,7 +64,7 @@ class MultiViewDepthTraining:
                  grad_clip_max_norm: Optional[float] = None,
                  num_workers: Optional[int] = 8,
                  print_interval: Optional[int] = 100,
-                 log_loss_interval: Optional[int] = 1,
+                 log_loss_interval: Optional[int] = 100,
                  log_interval: Optional[int] = 5000,
                  save_checkpoint_interval_min: Optional[int] = 20,
                  log_tensorboard: Optional[bool] = True,
@@ -171,7 +171,7 @@ class MultiViewDepthTraining:
     def _init_batch_augmentations(self, batch_augmentations):
         for batch_augmentation in batch_augmentations:
             if isinstance(batch_augmentation, str):
-                batch_augmentation = create_augmentation(batch_augmentation)
+                batch_augmentation = create_batch_augmentation(batch_augmentation)
             self.batch_augmentations.append(batch_augmentation)
 
     def __call__(self):

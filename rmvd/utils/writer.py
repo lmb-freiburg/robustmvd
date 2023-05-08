@@ -24,13 +24,14 @@ from time import time
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.tensorboard.summary import make_np
+import wandb
 
 from .vis import vis, vis_image, vis_2d_array
 
 EVENT_WRITERS = []
 EVENT_STORAGE = []
 GLOBAL_BUFFER = {}
-MAX_BUFFER_SIZE = 20
+MAX_BUFFER_SIZE = 20000
 
 
 class EventType(enum.Enum):
@@ -219,13 +220,13 @@ def write_out_storage():
     EVENT_STORAGE.clear()
 
 
-def setup_writers(log_wandb, log_tensorboard, max_iterations, tensorboard_logs_dir=None, wandb_logs_dir=None):
+def setup_writers(log_wandb, log_tensorboard, max_iterations, tensorboard_logs_dir=None, wandb_logs_dir=None, exp_id=None, config=None, comment=None):
     GLOBAL_BUFFER["max_iter"] = max_iterations
 
     if log_wandb:
         assert wandb_logs_dir is not None
         os.makedirs(wandb_logs_dir, exist_ok=True)
-        curr_writer = WandbWriter(log_dir=wandb_logs_dir)
+        curr_writer = WandbWriter(log_dir=wandb_logs_dir, exp_id=exp_id, config=config, comment=comment)
         EVENT_WRITERS.append(curr_writer)
     if log_tensorboard:
         assert tensorboard_logs_dir is not None
@@ -292,9 +293,8 @@ class TimeWriter:
 class WandbWriter(Writer):
     """WandDB Writer Class"""
 
-    def __init__(self, log_dir):
-        import wandb  # only import when WandbWriter is used
-        wandb.init(project="robustmvd", dir=str(log_dir), reinit=True, resume=True)
+    def __init__(self, log_dir, exp_id=None, config=None, comment=None):
+        wandb.init(project="robustmvd", dir=str(log_dir), reinit=True, resume=True, config=config, name=exp_id, notes=comment)
 
     def write_tensor(self, name, tensor, step, **kwargs):
         img = vis(tensor, **kwargs)

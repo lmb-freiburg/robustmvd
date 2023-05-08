@@ -8,6 +8,7 @@ Based on the model registry from the timm package ( https://github.com/rwightman
 _datasets = {}  # keys are (base_dataset, dataset_type, split)
 _default_splits = {}
 _aug_fcts = {}
+_batch_aug_fcts = {}
 
 
 def register_dataset(dataset_cls):
@@ -165,21 +166,48 @@ def get_dataset(dataset_name, dataset_type=None, split=None):
 
     return _datasets[(base_dataset, dataset_type, split)]
 
+
 def register_augmentation(augmentation_factory):
     """Register augmentation by name."""
     aug_fct_name = augmentation_factory.__name__
     _aug_fcts[aug_fct_name] = augmentation_factory
     return augmentation_factory
 
+
 def list_augmentations():
     """Get list of all augmentations."""
     return list(sorted(_aug_fcts.keys()))
+
 
 def has_augmentation(augmentation_name):
     """Check if augmentation is registered."""
     return augmentation_name in _aug_fcts
 
+
 def create_augmentation(augmentation_name, **kwargs):
     """Get augmentation by name."""
     assert has_augmentation(augmentation_name), f'The requested augmentation function "{augmentation_name}" does not exist. Available augmentation functions are: {" ".join(list_augmentations())}'
     return _aug_fcts[augmentation_name](**kwargs)
+
+
+def register_batch_augmentation(batch_augmentation_factory):
+    """Register batch augmentation by name."""
+    batch_aug_fct_name = batch_augmentation_factory.__name__
+    _batch_aug_fcts[batch_aug_fct_name] = batch_augmentation_factory
+    return batch_augmentation_factory
+
+
+def list_batch_augmentations():
+    """Get list of all batch augmentations."""
+    return list(sorted(_batch_aug_fcts.keys()))
+
+
+def has_batch_augmentation(batch_augmentation_name):
+    """Check if batch augmentation is registered."""
+    return batch_augmentation_name in _batch_aug_fcts
+
+
+def create_batch_augmentation(batch_augmentation_name, **kwargs):
+    """Get batch augmentation by name."""
+    assert has_batch_augmentation(batch_augmentation_name), f'The requested batch augmentation function "{batch_augmentation_name}" does not exist. Available batch augmentation functions are: {" ".join(list_batch_augmentations())}'
+    return _batch_aug_fcts[batch_augmentation_name](**kwargs)

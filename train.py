@@ -6,7 +6,7 @@ import os.path as osp
 
 import torch
 
-from rmvd import create_model, list_models, create_dataset, create_compound_dataset, list_datasets, create_training, list_trainings, create_optimizer, list_optimizers, create_scheduler, list_schedulers, create_loss, list_losses, list_augmentations
+from rmvd import create_model, list_models, create_dataset, create_compound_dataset, list_datasets, create_training, list_trainings, create_optimizer, list_optimizers, create_scheduler, list_schedulers, create_loss, list_losses, list_augmentations, list_batch_augmentations
 
 
 def train(args):
@@ -74,6 +74,7 @@ def train(args):
                                batch_augmentations=args.batch_augmentations,
                                grad_clip_max_norm=args.grad_clip_max_norm,
                                num_workers=args.num_workers,
+                               log_interval=args.log_interval,
                                log_tensorboard=not args.no_tensorboard,
                                log_wandb=args.wandb,
                                log_full_batch=args.log_full_batch,
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('--augmentations', nargs='*',
                         help=f"Data augmentations. Options are: {', '.join(list_augmentations())}")
     parser.add_argument('--batch_augmentations', nargs='*',
-                        help=f"Data augmentations that are applied to the whole batch. Options are: {', '.join(list_augmentations())}")  # TODO
+                        help=f"Data augmentations that are applied to the whole batch. Options are: {', '.join(list_batch_augmentations())}")
     parser.add_argument('--augmentations_per_dataset', nargs='*', action='append',
                         help=f"Data augmentations per dataset in case training is done on multiple datasets and the "
                         f"datasets should have different augmentations. Options are: {', '.join(list_augmentations())}")
@@ -125,6 +126,7 @@ if __name__ == '__main__':
                              f"Options for additional model inputs are: intrinsics, poses, depth_range.",
                         type=str)
 
+    parser.add_argument('--log_interval', type=int, help="Log interval in iterations. Default: 5000.", default=5000)
     parser.add_argument('--log_full_batch', action='store_true', help='Write all samples in batch to log. '
                                                                       'Default: only log first sample.')
     parser.add_argument('--no_tensorboard', action='store_true', help='Do not log to tensorboard. Default: do log.')

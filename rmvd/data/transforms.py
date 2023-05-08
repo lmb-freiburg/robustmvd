@@ -1,13 +1,11 @@
-import math
-
+import torch
 import numpy as np
 from skimage.transform import resize
 from PIL import Image
 import torchvision.transforms
 import cv2
 
-from rmvd.utils import trans_from_transform, rot_from_transform, transform_from_rot_trans, compute_depth_range
-from .registry import register_augmentation
+from rmvd.utils import trans_from_transform, rot_from_transform, transform_from_rot_trans, compute_depth_range, to_numpy
 
 
 class Bernoulli:
@@ -195,7 +193,7 @@ class SpatialAugmentation:
             # crop intrinsics:
             if "intrinsics" in sample:
                 intrinsics = sample["intrinsics"]
-                shift_arr = np.array([[0, 0, -x0], [0, 0, -y0], [0.] * 3])  # 3, 3
+                shift_arr = np.array([[0, 0, -x0], [0, 0, -y0], [0.] * 3], dtype=np.float32)  # 3, 3
                 intrinsics = [intrinsic + shift_arr for intrinsic in intrinsics]
                 sample["intrinsics"] = intrinsics
                 
@@ -290,13 +288,13 @@ class Scale3DFixed:
         self.__p = p
         
     def __call__(self, sample):
-        poses = sample["poses"]
-        depth = sample["depth"]
-        invdepth = sample["invdepth"]
-        depth_range = sample["depth_range"]
-        scale_factor = self.__scale
-        
         if np.random.rand() < self.__p:
+            poses = sample["poses"]
+            depth = sample["depth"]
+            invdepth = sample["invdepth"]
+            depth_range = sample["depth_range"]
+            
+            scale_factor = self.__scale
             for idx, pose in enumerate(poses):  # pose is 4, 4, float32
                 trans = trans_from_transform(pose) * scale_factor
                 poses[idx] = transform_from_rot_trans(rot_from_transform(pose), trans)
@@ -304,10 +302,11 @@ class Scale3DFixed:
             invdepth = invdepth / scale_factor
             depth_range = (depth_range[0] * scale_factor, depth_range[1] * scale_factor)
             
-        sample["poses"] = poses
-        sample["depth"] = depth
-        sample["invdepth"] = invdepth
-        sample["depth_range"] = depth_range
+            sample["poses"] = poses
+            sample["depth"] = depth
+            sample["invdepth"] = invdepth
+            sample["depth_range"] = depth_range
+            
         return sample
 
 
@@ -337,7 +336,7 @@ class NormalizeIntrinsics:
         ht, wd = image.shape[-2:]
         
         if "intrinsics" in sample:
-            scale_arr = np.array([[wd]*3, [ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
-            sample["intrinsics"] = [intrinsic / scale_arr for intrinsic in sample["intrinsics"]]
+            scale_arr = np.array([[1/wd]*3, [1/ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
+            sample["intrinsics"] = [intrinsic * scale_arr for intrinsic in sample["intrinsics"]]
             
         return sample

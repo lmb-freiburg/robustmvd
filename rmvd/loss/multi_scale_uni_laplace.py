@@ -62,7 +62,7 @@ class MultiScaleUniLaplace(nn.Module):
         pointwise_losses = {}
 
         gt = sample_gt[self.modality]
-        gt_mask = gt > 0  # TODO: produce mask from dataset via update
+        gt_mask = gt > 0
 
         preds_all = aux[f"{self.modality}s_all"]
         pred_log_bs_all = aux[f"{self.modality}_log_bs_all"]
