@@ -1,11 +1,22 @@
 import importlib
 import collections
 import re
+import random
 
 import numpy as np
 import torch
 from torch._six import string_classes
 import pytoml
+
+
+def set_random_seed(seed=None, use_gpu=True):
+    if seed is None:
+        seed = random.randint(1, 10000)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    if use_gpu and torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def compute_depth_range(depth=None, invdepth=None, default_min_depth=0.1, default_max_depth=100.):

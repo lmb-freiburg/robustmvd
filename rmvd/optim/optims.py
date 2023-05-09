@@ -12,7 +12,7 @@ def adam(model, lr, **_):
     
 
 @register_scheduler
-def flownet_scheduler(optimizer):
+def flownet_scheduler(optimizer, **_):
     lr_intervals = [300000, 400000, 500000]
     gamma = 0.5
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=lr_intervals, gamma=gamma)

@@ -8,7 +8,7 @@ from .registry import register_loss
 
 class MultiScaleUniLaplace(nn.Module):
     def __init__(self, model, weight_decay=1e-4, gt_interpolation="nearest", modality="invdepth", verbose=True,
-                 deterministic_loss_iterations=2000):
+                 deterministic_loss_iterations=2000, mean_scaling_factor=1):
 
         super().__init__()
 
@@ -21,10 +21,11 @@ class MultiScaleUniLaplace(nn.Module):
         self.gt_interpolation = gt_interpolation
 
         self.loss_weights = [1 / 16, 1 / 16, 1 / 16, 1 / 8, 1 / 4, 1 / 2, 1]
-        self.loss_weights = [105000 * weight for weight in self.loss_weights]
+        self.loss_weights = [100 * weight for weight in self.loss_weights]
 
         self.modality = modality
         self.deterministic_loss_iterations = deterministic_loss_iterations
+        self.mean_scaling_factor = mean_scaling_factor
 
         self.reg_params = self.get_regularization_parameters(model)  # TODO: I think there is a better way in pytorch to do this
 
@@ -61,10 +62,10 @@ class MultiScaleUniLaplace(nn.Module):
         sub_losses = {}
         pointwise_losses = {}
 
-        gt = sample_gt[self.modality]
+        gt = sample_gt[self.modality] * self.mean_scaling_factor
         gt_mask = gt > 0
 
-        preds_all = aux[f"{self.modality}s_all"]
+        preds_all = [x * self.mean_scaling_factor for x in aux[f"{self.modality}s_all"]]
         pred_log_bs_all = aux[f"{self.modality}_log_bs_all"]
 
         total_mnll_loss = 0
@@ -107,4 +108,5 @@ class MultiScaleUniLaplace(nn.Module):
 
 @register_loss
 def robust_mvd_loss(**kwargs):
-    return MultiScaleUniLaplace(weight_decay=1e-4, gt_interpolation="nearest", modality="invdepth", deterministic_loss_iterations=2000, **kwargs)
+    return MultiScaleUniLaplace(weight_decay=1e-4, gt_interpolation="nearest", modality="invdepth", deterministic_loss_iterations=2000, 
+                                mean_scaling_factor=1050, **kwargs)

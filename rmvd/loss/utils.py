@@ -47,7 +47,7 @@ def pointwise_ae(gt, pred, mask=None, weight=None):
 def m_univariate_laplace_nll(gt, pred_a, pred_log_b, mask=None, weight=None, eps=1e-9):
 
     e = pred_a - gt
-    ae = torch.abs(e)  # torch.sqrt(torch.pow(e, 2) + 5e-3)
+    ae = torch.abs(e)
     pred_b = torch.exp(pred_log_b)
     nll = ae / pred_b + pred_log_b  # N, 1, H, W
 

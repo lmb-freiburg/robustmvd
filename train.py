@@ -7,9 +7,12 @@ import os.path as osp
 import torch
 
 from rmvd import create_model, list_models, create_dataset, create_compound_dataset, list_datasets, create_training, list_trainings, create_optimizer, list_optimizers, create_scheduler, list_schedulers, create_loss, list_losses, list_augmentations, list_batch_augmentations
+from rmvd.utils import set_random_seed
 
 
 def train(args):
+    
+    set_random_seed(args.seed)
 
     if args.model is None:
         print(f"No model specified via --model. Available models are: {', '.join(list_models(trainable_only=True))}")
@@ -90,6 +93,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', help="Path to folder for output data.", required=True)
     parser.add_argument('--num_gpus', type=int, help="Number of GPUs. 0 means use CPU. Default: use 1 GPU.", default=1)
+    parser.add_argument('--seed', type=int, help="Random seed. Default: 42.", default=42)
     parser.add_argument('--batch_size', type=int, required=True, help="Batch size.")
     parser.add_argument('--max_iterations', type=int, required=True, help="Maximum number of iterations to train.")
     parser.add_argument('--num_workers', type=int, help="Number of workers for data loading. Default: 8.", default=8)

@@ -106,10 +106,34 @@ required storage structure in a directory called `/path/to/flyingthings3d_conver
 ./scripts/convert_flyingthings3d.py /path/to/flyingthings3d /path/to/flyingthings3d_converted
 ```
 
-Note that the script partially creates links in the `/path/to/FlyingThings3D_converted` directory, instead of
+Note that the script partially creates links in the `/path/to/flyingthings3d_converted` directory, instead of
 copying the actual files.
 
-Then specify the converted directory (`/path/to/FlyingThings3D_converted`) in the `paths.toml` file.
+Then specify the converted directory `/path/to/flyingthings3d_converted` as
+- `/path/to/flyingthings3d_converted/TRAIN` for the training set
+- `/path/to/flyingthings3d_converted/TEST` for the test set
+in the `paths.toml` file.
+
+### StaticThings3D
+From the directory of this `README` file, execute the script `scripts/download_staticthings3d.sh` and specify the 
+download target directory to download the dataset:
+```bash
+./scripts/download_staticthings3d.sh /path/to/staticthings3d
+```
+
+The dataloader requires a different storage structure than the downloaded dataset. 
+Execute the script `scripts/convert_staticthings3d.py` to create the 
+required storage structure in a directory called `/path/to/staticthings3d_converted`:
+```bash
+./scripts/convert_staticthings3d.py /path/to/staticthings3d /path/to/staticthings3d_converted
+```
+
+Note that the script mostly creates links in the `/path/to/staticthings3d_converted` directory, instead of
+copying the actual files.
+
+Then specify the converted directory `/path/to/staticthings3d_converted` as
+- `/path/to/staticthings3d_converted/TRAIN` for the training set (there is no test set!)
+in the `paths.toml` file.
 
 ### BlendedMVS
 Download the BlendedMVS low-res set (27.5GB) from https://github.com/YoYo000/BlendedMVS (we do not provide a download script,

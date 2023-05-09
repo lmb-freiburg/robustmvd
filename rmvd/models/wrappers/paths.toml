@@ -6,3 +6,12 @@
 
 [midas]
     root = '/tmp/midas'
+
+[patchmatchnet]
+    root = '/tmp/patchmatchnet'
+
+[cvp_mvsnet]
+    root = '/tmp/cvp_mvsnet'
+
+[vis_mvsnet]
+    root = '/tmp/vis_mvsnet'

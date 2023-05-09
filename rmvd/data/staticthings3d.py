@@ -225,7 +225,7 @@ class StaticThings3DSeq4Train(StaticThings3D):
     dataset_type = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else osp.join(self._get_path("staticthings3d", "root"), "TRAIN")
+        root = root if root is not None else self._get_path("staticthings3d", "train", "root")
         
         sample_confs = self._get_sample_confs()
         filter_hard_samples = True
