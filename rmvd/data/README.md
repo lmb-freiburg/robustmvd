@@ -112,6 +112,7 @@ copying the actual files.
 Then specify the converted directory `/path/to/flyingthings3d_converted` as
 - `/path/to/flyingthings3d_converted/TRAIN` for the training set
 - `/path/to/flyingthings3d_converted/TEST` for the test set
+
 in the `paths.toml` file.
 
 ### StaticThings3D
@@ -133,6 +134,7 @@ copying the actual files.
 
 Then specify the converted directory `/path/to/staticthings3d_converted` as
 - `/path/to/staticthings3d_converted/TRAIN` for the training set (there is no test set!)
+
 in the `paths.toml` file.
 
 ### BlendedMVS

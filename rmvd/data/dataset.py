@@ -151,14 +151,6 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
         index = self._allowed_indices[index]
         sample = self.samples[index]
 
-        if not self._seed_initialized:
-            worker_info = torch.utils.data.get_worker_info()
-            if worker_info is not None:
-                torch.manual_seed(worker_info.id)
-                np.random.seed(worker_info.id)
-                random.seed(worker_info.id)
-                self._seed_initialized = True
-
         sample_dict = sample.load(root=self.root)
         sample_dict['_index'] = index
         sample_dict['_dataset'] = self.full_name

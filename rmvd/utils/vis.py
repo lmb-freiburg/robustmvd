@@ -6,6 +6,7 @@ import torch
 from torch.utils.tensorboard.summary import make_np
 from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
+import skimage.transform
 
 from .turbo_colormap import cmap as turbo_cmap
 
@@ -123,9 +124,26 @@ def _apply_out_action(out, out_action, out_format):
     elif isinstance(out_action, str):
         if out_action == 'show':
             out.show()
+            
+            
+def _equalize_sizes(imgs):
+    if isinstance(imgs[0], Image.Image):
+        max_width = max([img.width for img in imgs])
+        max_height = max([img.height for img in imgs])
+        for i, img in enumerate(imgs):
+            if img.width != max_width or img.height != max_height:
+                imgs[i] = img.resize(size=(max_width, max_height), resample=Image.NEAREST)
+    else:  # np, shape CHW
+        max_width = max([img.shape[2] for img in imgs])
+        max_height = max([img.shape[1] for img in imgs])
+        for i, img in enumerate(imgs):
+            if img.shape[2] != max_width or img.shape[1] != max_height:
+                imgs[i] = skimage.transform.resize(img, [img.shape[0], max_height, max_width], order=0, preserve_range=True)
+    return imgs
 
 
 def cat_images_colwise(imgs):
+    imgs = _equalize_sizes(imgs)
     if isinstance(imgs[0], Image.Image):  # PIL
         img = np.concatenate([np.array(img) for img in imgs], axis=1)
         img = Image.fromarray(img)
@@ -135,6 +153,7 @@ def cat_images_colwise(imgs):
 
 
 def cat_images_rowwise(imgs):
+    imgs = _equalize_sizes(imgs)
     if isinstance(imgs[0], Image.Image):  # PIL
         img = np.concatenate([np.array(img) for img in imgs], axis=0)
         img = Image.fromarray(img)

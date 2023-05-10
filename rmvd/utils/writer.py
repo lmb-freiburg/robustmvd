@@ -202,7 +202,6 @@ def put_time(name, duration, step, write=True, avg_over_steps=True, update_eta=F
     if update_eta and write:
         remain_iter = GLOBAL_BUFFER["max_iter"] - step
         remain_time = remain_iter * GLOBAL_BUFFER["events"][name]["avg"]
-        put_scalar("00_overview/eta_sec", remain_time, step)
         put_scalar("00_overview/eta_hours", remain_time/3600, step)
         put_scalar("00_overview/eta_days", remain_time/(3600*24), step)
 

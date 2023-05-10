@@ -4,7 +4,6 @@ from typing import Optional, Sequence
 import time
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 
 from rmvd import create_batch_augmentation
 from rmvd.utils import TrainStateSaver, WeightsOnlySaver, to_torch, get_torch_model_device, \
@@ -67,8 +66,6 @@ class MultiViewDepthTraining:
                  log_loss_interval: Optional[int] = 100,
                  log_interval: Optional[int] = 5000,
                  save_checkpoint_interval_min: Optional[int] = 20,
-                 log_tensorboard: Optional[bool] = True,
-                 log_wandb: Optional[bool] = False,
                  log_full_batch: Optional[bool] = False,
                  verbose: bool = True,
                  **_, ):
@@ -116,8 +113,6 @@ class MultiViewDepthTraining:
         assert self.alignment is None, "Alignment is not yet implemented."
 
         self.log_full_batch = log_full_batch
-        writer.setup_writers(log_tensorboard=log_tensorboard, log_wandb=log_wandb, max_iterations=self.max_iterations,
-                             tensorboard_logs_dir=self.tensorboard_logs_dir, wandb_logs_dir=self.wandb_logs_dir)
 
         self.print_interval = print_interval
         self.log_interval = log_interval
@@ -153,8 +148,6 @@ class MultiViewDepthTraining:
 
     def _init_dirs(self):
         self.log_file_path = osp.join(self.out_dir, "log.txt")
-        self.tensorboard_logs_dir = osp.join(self.out_dir, "tensorboard_logs")
-        self.wandb_logs_dir = osp.join(self.out_dir, "wandb_logs")
         self.artifacts_dir = osp.join(self.out_dir, "artifacts")
         self.checkpoints_dir = osp.join(self.out_dir, "checkpoints")
         self.weights_only_checkpoints_dir = osp.join(self.out_dir, "weights_only_checkpoints_dir")
