@@ -52,8 +52,13 @@ def train(args):
     os.makedirs(out_dir, exist_ok=True)
     os.makedirs(tensorboard_logs_dir, exist_ok=True)
     os.makedirs(wandb_logs_dir, exist_ok=True)
-    writer.setup_writers(log_tensorboard=not args.no_tensorboard, log_wandb=args.wandb, max_iterations=args.max_iterations,
-                         tensorboard_logs_dir=tensorboard_logs_dir, wandb_logs_dir=wandb_logs_dir)
+    writer.setup_writers(log_tensorboard=not args.no_tensorboard, 
+                         log_wandb=args.wandb, 
+                         max_iterations=args.max_iterations,
+                         tensorboard_logs_dir=tensorboard_logs_dir, 
+                         wandb_logs_dir=wandb_logs_dir,
+                         exp_id=args.exp_id,
+                         comment=args.comment,)  # TODO: config=CONFIG
 
     print()
     print(f"Training {args.model} model on the dataset {'+'.join(args.dataset)} in the {args.training_type} training setting.\n")
@@ -141,6 +146,8 @@ if __name__ == '__main__':
                                                                       'Default: only log first sample.')
     parser.add_argument('--no_tensorboard', action='store_true', help='Do not log to tensorboard. Default: do log.')
     parser.add_argument('--wandb', action='store_true', help='Log to weights and biases. Default: Do not log.')
+    parser.add_argument('--exp_id', type=str, help="Experiment ID. Used for wandb logging.")
+    parser.add_argument('--comment', type=str, help="Comment for the experiment. Used for wandb logging.")
 
     args = parser.parse_args()
 

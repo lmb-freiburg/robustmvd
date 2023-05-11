@@ -4,7 +4,7 @@ from .registry import register_augmentation, list_augmentations, has_augmentatio
 
 # import all datasets; this triggers the registration of the datasets in the registry
 from .eth3d import ETH3DTrainRobustMVD
-from .kitti import KITTIRobustMVD
+from .kitti import KITTIRobustMVD, KITTIEigenDenseDepthTest
 from .dtu import DTURobustMVD
 from .scannet import ScanNetRobustMVD
 from .tanks_and_temples import TanksAndTemplesTrainRobustMVD
