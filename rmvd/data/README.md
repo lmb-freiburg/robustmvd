@@ -49,6 +49,12 @@ specify the download directory for the dataset:
 ./scripts/download_dtu.sh /path/to/dtu_raw
 ```
 
+**Note**: the last download step of the script fetches the ground truth depth maps from Google Drive via `gdown`, 
+which frequently fails, as Google Drive sometimes blocks the download.
+In that case, either wait a while and execute the script again, or download the file manually in a browser from 
+<https://drive.google.com/open?id=1LVy8tsWajG3uPTCYPSxDvVXFCdIYXaS-> and extract it in `/path/to/dtu_raw`, resulting 
+in a directory `/path/to/dtu_raw/Depths`.
+
 Then, from the directory of this `README` file, execute the script `scripts/convert_dtu.sh` to bring the dataset in the
 structure that is required by the dataloader:
 ```bash

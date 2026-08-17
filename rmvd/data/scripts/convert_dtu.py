@@ -30,8 +30,9 @@ def copy_rectified_images(in_base, out_base):
 
 
 def copy_gt_depths(in_base, out_base):
-    in_base = osp.join(in_base, 'dtu', 'Depths_raw')
-    scans = os.listdir(in_base)
+    in_base = osp.join(in_base, 'Depths')
+    # the download also contains downsampled depths in "scanX_train" directories, which are not used here:
+    scans = [x for x in os.listdir(in_base) if not x.endswith("_train")]
 
     for scan in tqdm(scans, "Processed scans"):
         in_path = osp.join(in_base, scan)
