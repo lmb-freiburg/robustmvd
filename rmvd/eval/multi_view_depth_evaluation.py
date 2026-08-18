@@ -3,7 +3,6 @@ import os.path as osp
 import time
 from copy import deepcopy
 from typing import Optional, Sequence, Tuple, Union
-import warnings
 import pickle
 
 import torch
@@ -605,9 +604,7 @@ class MultiViewDepthEvaluation:
 
             if self.eval_uncertainty:
                 sample_sparsification_curves = self.sparsification_curves
-                with warnings.catch_warnings():
-                    warnings.simplefilter("ignore", category=FutureWarning)
-                    sparsification_curves = sample_sparsification_curves.mean(axis=0, level=1)
+                sparsification_curves = sample_sparsification_curves.astype(float).groupby(level="curve", sort=False).mean()
 
                 sparsification_curves.to_pickle(osp.join(self.quantitatives_dir, "sparsification_curves.pickle"))
                 sparsification_curves.to_csv(osp.join(self.quantitatives_dir, "sparsification_curves.csv"))

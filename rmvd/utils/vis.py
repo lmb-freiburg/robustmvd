@@ -30,10 +30,7 @@ def _get_default_font(size=None):
 
 
 def _get_cmap(cmap_name):
-    if cmap_name == 'turbo':
-        cmap = turbo_cmap
-    else:
-        cmap = plt.get_cmap(cmap_name)
+    cmap = plt.get_cmap(cmap_name)
     return cmap
 
 
@@ -76,7 +73,7 @@ def _get_draw_text(text, label, text_off, image_range_text, image_range_text_off
     
     if label is not None:
         draw_text += str(label)
-        if (not text_off) or (not image_range_text_off):
+        if (not text_off and text is not None) or (not image_range_text_off):
             draw_text += "\n"
     
     if text is not None and not text_off:
@@ -195,6 +192,24 @@ def vis(arr, **kwargs):
             return vis_2d_array(arr, **kwargs)
     else:
         raise ValueError(f"Can not visualize an array of shape {shape}.")
+    
+    
+def check_vis(arr):
+
+    ndim = arr.ndim
+    shape = arr.shape
+
+    if ndim == 2:
+        return True
+    elif ndim == 3:
+            return True
+    elif ndim == 4:
+        if shape[1] == 3:
+            return True
+        elif shape[1] == 1:
+            return True
+    else:
+        return False
 
 
 def vis_2d_array(arr, full_batch=False, batch_labels=None, **kwargs):
@@ -567,7 +582,11 @@ def add_text_to_img(img, text,
     text_color = _DEFAULT_TEXT_COLOR if text_color is None else text_color
     font = _get_default_font(size=font_size) if font is None else font
     draw = ImageDraw.Draw(img)
-    text_size = draw.multiline_textsize(text=text, font=font)  # (width, height)
+    
+    if hasattr(draw, 'multiline_textsize'):  # older PIL versions
+        text_size = draw.multiline_textsize(text=text, font=font)  # (width, height)
+    else:  # newer PIL versions
+        text_size = draw.multiline_textbbox(xy=[0,0], text=text, font=font)[-2:]  # (width, height)
 
     # shift xy pos according to xy_abs/rel_shifts:
     x_shift = (x_rel_shift * text_size[0] if x_rel_shift is not None else 0) + (x_abs_shift if x_abs_shift is not None else 0)
