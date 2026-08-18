@@ -3,7 +3,7 @@ from .registry import register_dataset, list_base_datasets, list_dataset_types, 
 from .registry import register_augmentation, list_augmentations, has_augmentation, create_augmentation, register_batch_augmentation, list_batch_augmentations, has_batch_augmentation, create_batch_augmentation
 
 # import all datasets; this triggers the registration of the datasets in the registry
-from .eth3d import ETH3DTrainRobustMVD
+from .eth3d import ETH3DTrainRobustMVD, ETH3DTrainMVSAnywhere
 from .kitti import KITTIRobustMVD, KITTIEigenDenseDepthTest
 from .dtu import DTURobustMVD
 from .scannet import ScanNetRobustMVD

@@ -35,7 +35,7 @@ class UniformBernoulli:
         return gate * np.exp(np.random.uniform(low=self.mean - self.spread, high=self.mean + self.spread, size=size))
 
 
-class ResizeInputs:
+class ResizeInputs:  # works with and without batched inputs
     """Resize sample inputs to given size (height, width).
 
     Args:
@@ -51,21 +51,23 @@ class ResizeInputs:
         self.__interpolation_order = interpolation_order
 
     def __call__(self, sample):
-        image = sample["images"][0]
-        orig_ht, orig_wd = image.shape[-2:]
-        
+        orig_sizes = [image.shape[-2:] for image in sample["images"]]
+
         wd, ht = self.__width, self.__height
         # resize images
-        if "images" in sample:
+        if "images" in sample and sample["images"] is not None:
             images = sample["images"]
             images = [resize(image, list(image.shape[:-2]) + [ht, wd], order=self.__interpolation_order) for image in images]
             sample["images"] = images
-        
+
         # resize intrinsics:
-        if "intrinsics" in sample:
-            scale_arr = np.array([[wd / orig_wd]*3, [ht / orig_ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
-            sample["intrinsics"] = [intrinsic * scale_arr for intrinsic in sample["intrinsics"]]
-            
+        if "intrinsics" in sample and sample["intrinsics"] is not None:
+            intrinsics = []
+            for intrinsic, (orig_ht, orig_wd) in zip(sample["intrinsics"], orig_sizes):
+                scale_arr = np.array([[wd / orig_wd]*3, [ht / orig_ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
+                intrinsics.append(intrinsic * scale_arr)
+            sample["intrinsics"] = intrinsics
+
         return sample
     
 

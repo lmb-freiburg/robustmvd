@@ -29,6 +29,14 @@ target directory to download the dataset:
 ```
 Then specify the download directory `/path/to/eth3d` in the `paths.toml` file.
 
+Optionally, if you want to evaluate on ETH3D with undistorted images and depth maps (as proposed by
+MVSAnywhere), execute the script `scripts/compute_eth3d_undistorted.py` from the directory of this `README`
+file and specify the directory of the downloaded ETH3D dataset:
+```bash
+./scripts/compute_eth3d_undistorted.py /path/to/eth3d [--num_workers 6]
+```
+The script only needs `numpy`, `opencv-python` and `tqdm`, i.e. it runs in the normal `rmvd` environment.
+
 ### KITTI
 Download the KITTI raw data from <https://www.cvlibs.net/datasets/kitti/raw_data.php> using
 the "raw dataset download script (1 MB)" that is provided on the website. You need to register for this, 
@@ -316,6 +324,10 @@ Each  sample  contains  10  source  views,  using  the view  selection  provided
 ##### Depth range:
 A depth range is not available. Instead, the minimum and maximum value of the ground truth depth maps are used as 
 depth range.
+
+#### `mvsanywhere` split
+This is the split introduced in "MVSAnywhere: Zero-Shot Multi-View Stereo" by Izquierdo et al. It contains the same samples as the
+`robustmvd` split, but differs in using undistorted images and GT depth maps.
 
 ### KITTI
 #### `robustmvd` split

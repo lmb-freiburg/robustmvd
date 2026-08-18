@@ -19,12 +19,13 @@ class ETH3DImage:
 
 
 class ETH3DDepth:
-    def __init__(self, path):
+    def __init__(self, path, height, width):
         self.path = path
+        self.height = height
+        self.width = width
 
     def load(self, root):
-        height, width = 4032, 6048
-        depth = np.fromfile(osp.join(root, self.path), dtype=np.float32).reshape(height, width)
+        depth = np.fromfile(osp.join(root, self.path), dtype=np.float32).reshape(self.height, self.width)
         depth = np.nan_to_num(depth, posinf=0., neginf=0., nan=0.)
         depth = np.expand_dims(depth, 0)  # 1HW
         return depth
@@ -59,6 +60,25 @@ class ETH3DTrainRobustMVD(Dataset):
 
     base_dataset = 'eth3d'
     split = 'robustmvd'
+    dataset_type = 'mvd'
+
+    def __init__(self, root=None, layouts=None, **kwargs):
+        root = root if root is not None else self._get_path("eth3d", "root")
+
+        default_layouts = [
+            MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),
+            AllImagesLayout("all_images", num_views=11),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)
+
+
+@register_dataset
+class ETH3DTrainMVSAnywhere(Dataset):
+
+    base_dataset = 'eth3d'
+    split = 'mvsanywhere'
     dataset_type = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
