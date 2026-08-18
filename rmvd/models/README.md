@@ -169,6 +169,22 @@ of this `README`).
 
 It is not necessary to install additional dependencies.
 
+### `mvsanywhere_wrapped`
+This is the MVSAnywhere model as presented in the publication "MVSAnywhere: Zero Shot Multi-View Stereo" by Izquierdo et al. 
+The model is wrapped around the original implementation <https://github.com/nianticlabs/mvsanywhere>. It is trained on a variety of datasets and targets a very similar setting as the RMVD benchmark, namely multi view depth estimation independent of the target data, including generalization across domains and scales (hence "Anywhere"). 
+
+#### Setup:
+From the directory of this `README` file, execute the script `wrappers/scripts/setup_mvsanywhere.sh` and specify the local
+directory to clone the original repository:
+```bash
+./wrappers/scripts/setup_mvsanywhere.sh /path/to/mvsanywhere
+```
+
+Then specify the local directory `/path/to/mvsanywhere` in the `wrappers/paths.toml` file (relative to the directory of  
+this `README`).
+
+To fulfill the dependencies required by MVSAnywhere, it is easiest to set up a new virtual environment following the instructions in the MVSAnywhere repository. In the simplest case, just `cd` to `/path/to/mvsanywhere` and execute `mamba env create -f environment.yml -n mvsanywhere`. No additional dependencies need to be installed for RMVD, as the MVSAnywhere repository already fulfills all dependencies for RMVD. 
+
 ---
 
 ## Usage

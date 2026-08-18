@@ -326,8 +326,7 @@ A depth range is not available. Instead, the minimum and maximum value of the gr
 depth range.
 
 #### `mvsanywhere` split
-This is the split introduced in "MVSAnywhere: Zero-Shot Multi-View Stereo" by Izquierdo et al. It contains the same samples as the
-`robustmvd` split, but differs in using undistorted images and GT depth maps.
+This is the split introduced in "MVSAnywhere: Zero-Shot Multi-View Stereo" by Izquierdo et al. It contains the same samples as the `robustmvd` split, but differs in using undistorted images and GT depth maps.
 
 ### KITTI
 #### `robustmvd` split

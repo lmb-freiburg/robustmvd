@@ -5,6 +5,7 @@ from .wrappers.midas import midas_big_v2_1_wrapped
 from .wrappers.vis_mvsnet import vis_mvsnet_wrapped
 from .wrappers.cvp_mvsnet import cvp_mvsnet_wrapped
 from .wrappers.patchmatchnet import patchmatchnet_wrapped
+from .wrappers.mvsanywhere import mvsanywhere_wrapped
 
 from .factory import create_model, prepare_custom_model
 from .registry import register_model, list_models, has_model

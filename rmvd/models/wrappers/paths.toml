@@ -15,3 +15,6 @@
 
 [vis_mvsnet]
     root = '/tmp/vis_mvsnet'
+
+[mvsanywhere]
+    root = '/tmp/mvsanywhere'
