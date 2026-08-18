@@ -30,7 +30,7 @@ class KITTIDepth:
         assert (np.max(depth_png) > 255)
 
         depth = depth_png.astype(float) / 256.
-        depth[depth_png == 0] = np.NaN
+        depth[depth_png == 0] = np.nan
 
         depth = depth.astype(np.float32)
         depth = np.nan_to_num(depth, posinf=0., neginf=0., nan=0.)

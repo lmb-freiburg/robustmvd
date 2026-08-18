@@ -227,7 +227,7 @@ class MultiViewDepthEvaluation:
 
             # prepare sample:
             should_qualitative = (self.cur_sample_idx in self.qualitative_indices) and (self.out_dir is not None)
-            keyview_idx = int(sample['keyview_idx'])
+            keyview_idx = int(sample['keyview_idx'].item())
             sample_inputs, sample_gt = self._inputs_and_gt_from_sample(sample)
 
             # get evaluation order:
@@ -368,13 +368,13 @@ class MultiViewDepthEvaluation:
             return self._get_nearest_source_view_ordering(sample_inputs=sample_inputs, sample_gt=sample_gt)
 
     def _get_nearest_source_view_ordering(self, sample_inputs, sample_gt):
-        keyview_idx = int(sample_inputs['keyview_idx'])
+        keyview_idx = int(sample_inputs['keyview_idx'].item())
         source_indices = [idx for idx in range(len(sample_inputs['images'])) if idx != keyview_idx]
         source_view_ordering = sorted(source_indices, key=lambda x: np.abs(x-keyview_idx))
         return source_view_ordering
 
     def _get_quasi_optimal_source_view_ordering(self, sample_inputs, sample_gt):
-        keyview_idx = int(sample_inputs['keyview_idx'])
+        keyview_idx = int(sample_inputs['keyview_idx'].item())
         source_indices = [idx for idx in range(len(sample_inputs['images'])) if idx != keyview_idx]
         source_scores = {}
 
@@ -711,7 +711,7 @@ class MultiViewDepthEvaluation:
 
 def filter_views_in_sample(sample, indices_to_keep):
     sample = deepcopy(sample)
-    keyview_idx = int(sample['keyview_idx'])
+    keyview_idx = int(sample['keyview_idx'].item())
     assert keyview_idx in indices_to_keep, "Keyview must not be filtered out."
     keyview_idx = indices_to_keep.index(keyview_idx)
 

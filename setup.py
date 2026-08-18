@@ -8,7 +8,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-exec(open('rmvd/version.py').read())
+exec(open(path.join(here, 'rmvd', 'version.py')).read())
 setup(
     name='rmvd',
     version=__version__,
@@ -27,9 +27,12 @@ setup(
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3.14',
+        'Programming Language :: Python :: 3.15',
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Software Development',
@@ -39,6 +42,6 @@ setup(
     keywords='pytorch models datatasets depth estimation multi-view benchmark',
     packages=find_packages(exclude=['sample_data', 'tests', 'weights']),
     include_package_data=True,
-    install_requires=['torch >= 1.9.0', 'numpy', 'pillow', 'matplotlib', 'pandas', 'pytoml', 'tqdm', 'opencv-python', 'scikit-image'],
-    python_requires='>=3.8',
+    install_requires=['torch', 'torchvision', 'numpy', 'pillow', 'matplotlib', 'pandas', 'pytoml', 'tqdm', 'opencv-python-headless', 'scikit-image', 'pyqt5', 'dill', 'easydict', 'wandb', 'tensorboard', 'gdown'],
+    python_requires='>=3.10',
 )

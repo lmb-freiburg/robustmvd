@@ -20,7 +20,7 @@ class Histogram:
     def add_values(self, tensor, mask=None):
         tensor = to_numpy(tensor)
         mask = to_numpy(mask) if mask is not None else mask
-        masked_tensor = tensor[mask.astype(np.bool)] if mask is not None else tensor
+        masked_tensor = tensor[mask.astype(bool)] if mask is not None else tensor
         self.counts += np.histogram(masked_tensor, bins=self.bins)[0]
 
     @property

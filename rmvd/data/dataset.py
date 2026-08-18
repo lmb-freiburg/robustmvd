@@ -59,7 +59,7 @@ class Dataset(torch.utils.data.Dataset, metaclass=abc.ABCMeta):
             if self.input_resize is not None:
                 print(f"\tImage resolution (height, width): ({input_size[0]}, {input_size[1]})")
             if self.target_resize is not None:
-                print(f"\Target resolution (height, width): ({target_size[0]}, {target_size[1]})")
+                print(f"\tTarget resolution (height, width): ({target_size[0]}, {target_size[1]})")
             print(f"Finished initializing dataset {self.name}.")
             print()
 

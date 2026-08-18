@@ -35,7 +35,7 @@ file and specify the directory of the downloaded ETH3D dataset:
 ```bash
 ./scripts/compute_eth3d_undistorted.py /path/to/eth3d [--num_workers 6]
 ```
-The script only needs `numpy`, `opencv-python` and `tqdm`, i.e. it runs in the normal `rmvd` environment.
+The script only needs `numpy`, `opencv` and `tqdm`, i.e. it runs in the normal `rmvd` environment.
 
 ### KITTI
 Download the KITTI raw data from <https://www.cvlibs.net/datasets/kitti/raw_data.php> using

@@ -24,7 +24,7 @@ def valid_mean(arr, mask, axis=None, keepdims=np._NoValue):
     with np.errstate(divide='ignore', invalid='ignore'):
         valid_mean = masked_arr_sum / num_valid
         is_valid = np.isfinite(valid_mean)
-        valid_mean = np.nan_to_num(valid_mean, copy=False, nan=0, posinf=0, neginf=0)
+        valid_mean = np.nan_to_num(valid_mean, nan=0, posinf=0, neginf=0)
 
     return valid_mean, is_valid
 

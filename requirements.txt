@@ -1,4 +1,4 @@
-torch==1.9.0
+torch
 torchvision
 numpy
 pillow
@@ -6,9 +6,11 @@ matplotlib
 pandas
 pytoml
 tqdm
-opencv-python
+opencv-python-headless
 scikit-image
 pyqt5
 dill
 easydict
 wandb
+tensorboard
+gdown
