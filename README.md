@@ -185,8 +185,27 @@ This is the official repository for the publication:
 > 
 > **3DV 2022**
 
-If you find our work useful, please consider citing:
+If you find our work useful, please cite:
 ```bibtex
+@inproceedings{schroeppel2022robust,
+  author     = {Philipp Schr\"oppel and Jan Bechtold and Artemij Amiranashvili and Thomas Brox},
+  booktitle  = {Proceedings of the International Conference on {3D} Vision ({3DV})},
+  title      = {A Benchmark and a Baseline for Robust Multi-view Depth Estimation},
+  year       = {2022}
+}
+```
+
+If you use the StaticThings3D dataset, please cite the following two publications (the first one introduces FlyingThings3D and the second one introduces StaticThings3D which is based on FlyingThings3D):
+```bibtex
+@InProceedings{MIFDB16,
+  author    = "N. Mayer and E. Ilg and P. H{\"a}usser and P. Fischer and D. Cremers and A. Dosovitskiy and T. Brox",
+  title     = "A Large Dataset to Train Convolutional Networks for Disparity, Optical Flow, and Scene Flow Estimation",
+  booktitle = "IEEE International Conference on Computer Vision and Pattern Recognition (CVPR)",
+  year      = "2016",
+  note      = "arXiv:1512.02134",
+  url       = "http://lmb.informatik.uni-freiburg.de/Publications/2016/MIFDB16"
+}
+
 @inproceedings{schroeppel2022robust,
   author     = {Philipp Schr\"oppel and Jan Bechtold and Artemij Amiranashvili and Thomas Brox},
   booktitle  = {Proceedings of the International Conference on {3D} Vision ({3DV})},
