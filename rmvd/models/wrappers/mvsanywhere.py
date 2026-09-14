@@ -6,7 +6,7 @@ import torch
 
 from ..registry import register_model
 from ..factory import prepare_custom_model
-from rmvd.utils import get_path
+from .utils import get_repo_path
 
 
 @register_model(trainable=False)
@@ -25,8 +25,7 @@ def mvsanywhere_wrapped(
     assert num_gpus >= 1 or not torch.cuda.is_available(), \
         "Model supports num_gpus=0 only if no CUDA devices are visible, e.g. by setting CUDA_VISIBLE_DEVICES='' ."
 
-    paths_file = osp.join(osp.dirname(osp.realpath(__file__)), 'paths.toml')
-    repo_path = get_path(paths_file, "mvsanywhere", "root")
+    repo_path = get_repo_path("mvsanywhere")
     repo_src_path = osp.join(repo_path, 'src')
     sys.path.insert(0, repo_src_path)
 

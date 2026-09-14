@@ -11,7 +11,7 @@ from torch.hub import load_state_dict_from_url
 
 from typing import Callable, Optional, Dict, Callable
 
-from rmvd.utils import numpy_collate
+from rmvd.utils import numpy_collate, logging
 
 
 _DOWNLOAD_PROGRESS = False
@@ -118,10 +118,10 @@ def build_model_with_cfg(
     if weights is not None:
         load_from_url = weights.startswith('http')
         if not load_from_url:
-            print(f'Using model weights from file {weights}.')
+            logging.info(f'Using model weights from file {weights}')
             state_dict = torch.load(weights, map_location='cpu')
         else:
-            print(f'Using model weights from url {weights}.')
+            logging.info(f'Using model weights from url {weights}')
             state_dict = load_state_dict_from_url(weights, map_location='cpu', progress=_DOWNLOAD_PROGRESS,
                                                   check_hash=_CHECK_HASH)
 

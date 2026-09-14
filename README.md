@@ -15,7 +15,7 @@ Following this, we describe the usage of the Robust Multi-view Depth Benchmark.
 
 ### Setup
 
-The code was tested with python 3.13 and PyTorch 2.13 on Ubuntu 24.04.
+The code was tested with python 3.13 and PyTorch 2.13 on Ubuntu 24.04 with an RTX 4090.
 For the setup, either the `requirements.txt` or the `setup.py` can be used.
 
 To install the requirements, run:
@@ -27,8 +27,8 @@ pip install -r requirements.txt
 
 To install the package using the `setup.py`, run:
 ```bash
-conda create -y -n rmvd python=3.13
-conda activate rmvd
+conda create -y -n rmvd-setuppy python=3.13
+conda activate rmvd-setuppy
 pip install -e .
 ```
 The package can then be imported via `import rmvd`.
@@ -46,16 +46,16 @@ For details, see [rmvd/models/README.md](rmvd/models/README.md).
 
 At time of publication, the code was used with python 3.8 and PyTorch 1.9 on Ubuntu 20.04. The original setup instructions were:
 ```bash
-conda create -y -n rmvd python=3.8
-conda activate rmvd
+conda create -y -n rmvd-legacy python=3.8
+conda activate rmvd-legacy
 pip install torch==1.9.0 torchvision numpy pillow matplotlib pandas pytoml tqdm opencv-python scikit-image pyqt5 dill easydict wandb
 ```
 
-Alternatively, on a newer machine, an environment with comparable settings can be set up as follows. This was tested on Ubuntu 24.04 with an RTX 3090:
+Alternatively, on a newer machine, an environment with comparable settings can be set up as follows. This was tested on Ubuntu 24.04 with an RTX 4090:
 ```bash
-conda create -y -n rmvd python=3.8
-conda activate rmvd
-pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 numpy==1.23.5 pillow==9.1.0 matplotlib pandas==1.3.2 pytoml tqdm opencv-python-headless scikit-image pyqt5 dill easydict wandb tensorboard gdown setuptools==59.5.0 -f https://download.pytorch.org/whl/torch_stable.html
+conda create -y -n rmvd-orig python=3.8
+conda activate rmvd-orig
+pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 numpy==1.23.5 pillow==9.1.0 matplotlib pandas==1.3.2 pytoml tqdm opencv-python-headless scikit-image pyqt5 dill easydict wandb tensorboard gdown termcolor einops setuptools==59.5.0 git+https://github.com/pschroeppel/itypes.git git+https://github.com/pschroeppel/iutils.git git+https://github.com/pschroeppel/iviz.git git+https://github.com/pschroeppel/imetrics.git -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
 </details>
@@ -73,26 +73,27 @@ The setup and interface of the models is explained in [rmvd/models/README.md](rm
 
 Evaluation is done with the script `eval.py`, for example on ETH3D:
 ```bash
-python eval.py --model robust_mvd --dataset eth3d --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 768 1152 
+python eval.py --model robust_mvd --dataset eth3d --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 768 1152 --input_resize_backend cv2_bilinear
 ```
 On KITTI:
 ```bash
-python eval.py --model robust_mvd --dataset kitti --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 384 1280
+python eval.py --model robust_mvd --dataset kitti --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 384 1280 --input_resize_backend cv2_bilinear
 ```
 On DTU:
 ```bash
-python eval.py --model robust_mvd --dataset dtu --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 896 1216
+python eval.py --model robust_mvd --dataset dtu --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 896 1216 --input_resize_backend cv2_bilinear
 ```
 On ScanNet:
 ```bash
-python eval.py --model robust_mvd --dataset scannet --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 448 640
+python eval.py --model robust_mvd --dataset scannet --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 448 640 --input_resize_backend cv2_bilinear
 ```
 On Tanks and Temples:
 ```bash
-python eval.py --model robust_mvd --dataset tanks_and_temples --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 704 1280
+python eval.py --model robust_mvd --dataset tanks_and_temples --eval_type mvd --inputs poses intrinsics --output /tmp/eval_output --input_size 704 1280 --input_resize_backend cv2_bilinear
 ```
 
-The parameters `model`, `dataset` and `eval_type` are required. 
+The parameters `eval_type`, `output` and `model` are required. Specifying an evaluation dataset (via the `dataset` `folder` or `dataset_cfg` arguments) is required, except for
+evaluating on the `robustmvd` benchmark.
 
 For further parameters, execute `python eval.py --help`.
 
@@ -112,20 +113,41 @@ see the READMEs mentioned above.
 
 ### Inference script
 
-Inference is done with the script `inference.py`, for example:
+Inference is done with the script `inference.py`. The inference supports data from supported research datasets, as well as custom data stored in a local folder.
+
+Running inference on a supported research dataset, for example on KITTI, works as follows:
 ```bash
-python inference.py --model robust_mvd
+python inference.py --output /tmp/inference_output --inference_type mvd --model robust_mvd --dataset kitti --inputs poses intrinsics --max_source_views 6 --input_size 384 1280
 ```
+
+Running inference on custom data stored in a local folder, for example the `sample_data` folder in this repository, which uses the `rmvd_sample` folder structure, works as follows:
+```bash
+python inference.py --output /tmp/inference_output --inference_type mvd --model robust_mvd --folder sample_data rmvd_sample --inputs poses intrinsics
+```
+
+For further details on supported folder structures, see [rmvd/data/README.md](rmvd/data/README.md). 
+
+For further parameters of the inference script, execute `python inference.py --help`.
 
 ### Programmatic inference
 
-Inference with `rmvd` models can be done programmatically, e.g.:
+Inference with `rmvd` models can be done programmatically on a whole dataset:
+```python
+import rmvd
+model = rmvd.create_model("robust_mvd", num_gpus=1)
+inference = rmvd.create_inference(inference_type="mvd", out_dir="/tmp/inference_output", inputs=["intrinsics", "poses"], max_source_views=6, verbose=True)
+dataset = rmvd.create_dataset("kitti", "mvd", input_size=(384, 1280))
+inference.run_on_dataset(dataset=dataset, model=model)
+```
+
+Inference with `rmvd` models can be done programmatically on a single sample:
 ```python
 import rmvd
 model = rmvd.create_model("robust_mvd")
-dataset = rmvd.create_dataset("eth3d", "mvd", input_size=(384, 576))
+dataset = rmvd.create_dataset("kitti", "mvd", input_size=(384, 1280))
 sample = dataset[0]
-pred, aux = model.run(**sample)
+inference = rmvd.create_inference(inference_type="mvd", inputs=["intrinsics", "poses"], max_source_views=6, verbose=True)
+pred = inference(model=model, sample=sample)
 ```
 
 ### Training script
@@ -138,12 +160,12 @@ This reproduces the training of the `robust_mvd` model from the publication. Not
 currently the only model that can be trained within the framework. All other models are wrappers around the original 
 implementations and can only be used for inference and evaluation.
 
-The parameters `training_type`, `model`, `dataset`, `output`, `batch_size`, `max_iterations`, `optimizer`, `scheduler` 
-and `loss` are required.
+The parameters `training_type`, `model`, `output`, `batch_size`, `max_iterations`, `optimizer`, `scheduler`, and
+`loss` are required. At least one `dataset`, `folder`, or `dataset_cfg` argument must also be specified.
 
-The parameter `dataset` can be specified multiple times to train on multiple datasets jointly. Augmentations are then 
-either specified once for all datasets (`--augmentations`) or once per dataset (`--augmentations_per_dataset`, which 
-has to be specified as often as `--dataset`). 
+The parameters `dataset`, `folder`, and `dataset_cfg` can be specified multiple times to train on multiple registered datasets, custom folders, or dataset configs jointly.
+Augmentations are then either specified once for all datasets/folders/configs (`--augmentations`) or once per dataset/folder/config (`--augmentations_per_dataset`, which 
+has to be specified as often as there are `--dataset`, `--folder`, and `--dataset_cfg` arguments combined).
 
 Training progress is logged to tensorboard and optionally to wandb if the `--wandb` flag is used. 
 
@@ -213,7 +235,7 @@ The following describes how to evaluate on the benchmark.
 
 Evaluation on the benchmark is done with the script `eval.py`, e.g.:
 ```bash
-python eval.py --model robust_mvd --eval_type robustmvd --inputs poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216 --scannet_size 448 640 --tanks_and_temples_size 704 1280
+python eval.py --model robust_mvd --eval_type robustmvd --inputs poses intrinsics --output /tmp/eval_benchmark --eth3d_size 768 1152 --kitti_size 384 1280 --dtu_size 896 1216 --scannet_size 448 640 --tanks_and_temples_size 704 1280 --input_resize_backend cv2_bilinear
 ```
 
 The script `eval_all.sh` allows evaluation of all models in the `rmvd` framework on the benchmark:
@@ -249,7 +271,6 @@ format and to call the model. For details about these functions, see [rmvd/model
 - [ ] add models that were evaluated in the publication to the `rmvd` framework
 - [ ] add code to gather and visualize benchmark results
 - [ ] add project page including an overview of the benchmark and a leaderboard
-- [ ] improve Tanks and Temples GT Depth
 - [ ] add code to train more models
 - [ ] add code to run inference directly from COLMAP or Meshroom outputs
 

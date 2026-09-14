@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from .registry import get_model
+from .registry import _get_model, has_model, list_models
 from .helpers import add_run_function
 
 
@@ -12,13 +12,18 @@ def create_model(name, pretrained=True, weights=None, train=False, num_gpus=1, *
         name (str): The name of the model to create.
         pretrained (bool): Whether to load the default pretrained weights for the model.
         weights (str): Path to custom weights to be loaded. Overrides `pretrained`.
-        train (bool): Whether to put the model in train mode.
+        train (bool): Whether to put the model in train mode. Only possible for trainable models.
         num_gpus (int): Number of GPUs to be used from the model.
 
     Keyword Args:
         **kwargs: Additional arguments to pass to the model.
     """
-    model_entrypoint = get_model(name=name)
+    assert has_model(name), f'The requested model "{name}" does not exist. Available models are: {" ".join(list_models())}'
+    if train:
+        assert has_model(name, trainable_only=True), \
+            f'The requested model "{name}" is not trainable. ' \
+            f'Available trainable models are: {" ".join(list_models(trainable_only=True))}'
+    model_entrypoint = _get_model(name=name)
     model = model_entrypoint(pretrained=pretrained, weights=weights, train=train, num_gpus=num_gpus, **kwargs)
     add_run_function(model)
     model.name = name

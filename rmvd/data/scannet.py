@@ -68,10 +68,10 @@ class ScanNetRobustMVD(Dataset):
 
     base_dataset = 'scannet'
     split = 'robustmvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("scannet", "root")
+        root = root if root is not None else self._get_root_from_paths_file("scannet")
 
         default_layouts = [
             MVDSequentialDefaultLayout("default", num_views=8, keyview_idx=3),

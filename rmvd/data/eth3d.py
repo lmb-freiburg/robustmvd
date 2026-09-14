@@ -60,10 +60,10 @@ class ETH3DTrainRobustMVD(Dataset):
 
     base_dataset = 'eth3d'
     split = 'robustmvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("eth3d", "root")
+        root = root if root is not None else self._get_root_from_paths_file("eth3d")
 
         default_layouts = [
             MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),
@@ -79,10 +79,10 @@ class ETH3DTrainMVSAnywhere(Dataset):
 
     base_dataset = 'eth3d'
     split = 'mvsanywhere'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("eth3d", "root")
+        root = root if root is not None else self._get_root_from_paths_file("eth3d")
 
         default_layouts = [
             MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),

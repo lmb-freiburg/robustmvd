@@ -14,3 +14,9 @@ easydict
 wandb
 tensorboard
 gdown
+termcolor
+einops
+git+https://github.com/pschroeppel/itypes.git
+git+https://github.com/pschroeppel/iutils.git
+git+https://github.com/pschroeppel/iviz.git
+git+https://github.com/pschroeppel/imetrics.git

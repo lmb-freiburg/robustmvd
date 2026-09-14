@@ -2,6 +2,8 @@ import os
 
 import torch
 
+from rmvd.utils import logging
+
 
 class WeightsOnlySaver:
     def __init__(self, model=None, full_path=None, base_path=None, base_name=None, max_to_keep=None):
@@ -49,7 +51,7 @@ class WeightsOnlySaver:
         model = model if model is not None else self.model
 
         checkpoint = get_checkpoints(full_path)[-1] if full_path is not None else self.get_latest_checkpoint()
-        print("Loading checkpoint {} (strict: {}).".format(checkpoint, strict))
+        logging.info("Loading checkpoint {} (strict: {}).".format(checkpoint, strict))
         load_model(path=checkpoint, model=model, strict=strict)
 
 
@@ -110,7 +112,7 @@ class TrainStateSaver:
         scheduler = scheduler if scheduler is not None else self.scheduler
 
         checkpoint = get_checkpoints(full_path)[-1] if full_path is not None else self.get_latest_checkpoint()
-        print("Loading checkpoint {}).".format(checkpoint))
+        logging.info("Loading checkpoint {}).".format(checkpoint))
         out_dict = load_all(path=checkpoint, model=model, optim=optim, scheduler=scheduler)
         return out_dict
 

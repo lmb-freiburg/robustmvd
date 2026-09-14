@@ -158,8 +158,12 @@ class AllImagesLayout(Layout):
                 from itypes.vizdata.image import ImageVisualizationData
                 key_idx = sample_dict['keyview_idx']
                 src_idx = idx if idx < key_idx else idx + 1
-                source_img = sample_dict['images'][src_idx]
-                source_img = vis(source_img, out_format={'type': 'np'}, image_range_text_off=True)
+                if len(sample_dict['images']) <= src_idx:
+                    source_img = np.ones_like(sample_dict['images'][0])
+                    source_img = vis(source_img, out_format={'type': 'np'}, image_range_text_off=True)
+                else:
+                    source_img = sample_dict['images'][src_idx]
+                    source_img = vis(source_img, out_format={'type': 'np'}, image_range_text_off=True)
                 source_img = source_img.transpose(1, 2, 0).astype(np.uint8)
                 source_img = ImageVisualizationData(source_img)
                 return {'data': source_img}

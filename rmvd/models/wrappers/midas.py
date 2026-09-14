@@ -8,22 +8,24 @@ import cv2
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
-from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index
+from .utils import get_repo_path
+from rmvd.utils import get_torch_model_device, to_numpy, to_torch, select_by_index, get_class
 
 
 class MiDaS_Wrapped(nn.Module):
-    def __init__(self, weights_name):
+    def __init__(self, weights_name, midas_cls_name, norm_mean, norm_std, resize_method, model_kwargs=None):
         super().__init__()
 
         import sys
-        paths_file = osp.join(osp.dirname(osp.realpath(__file__)), 'paths.toml')
-        repo_path = get_path(paths_file, "midas", "root")
+        repo_path = get_repo_path("midas")
         sys.path.insert(0, repo_path)
-        from midas.midas_net import MidasNet
+        midas_cls_name = f"midas.{midas_cls_name}"
+        model_cls = get_class(midas_cls_name)
         from midas.transforms import Resize, NormalizeImage, PrepareForNet
 
         weights_path = osp.join(repo_path, "weights", weights_name)
-        self.model = MidasNet(weights_path, non_negative=True)
+        model_kwargs = model_kwargs if model_kwargs is not None else {}
+        self.model = model_cls(weights_path, **model_kwargs)
 
         net_w, net_h = 384, 384
         self.transform = Compose(
@@ -34,10 +36,10 @@ class MiDaS_Wrapped(nn.Module):
                     resize_target=None,
                     keep_aspect_ratio=True,
                     ensure_multiple_of=32,
-                    resize_method="upper_bound",
+                    resize_method=resize_method,
                     image_interpolation_method=cv2.INTER_CUBIC,
                 ),
-                NormalizeImage(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                NormalizeImage(mean=norm_mean, std=norm_std),
                 PrepareForNet(),
             ]
         )
@@ -75,8 +77,22 @@ class MiDaS_Wrapped(nn.Module):
 
 
 @register_model(trainable=False)
-def midas_big_v2_1_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+def midas_large_v2_1_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
-    cfg = {"weights_name": "midas_v21-f6b98070.pt"}
+    
+    cfg = {"weights_name": "midas_v21_384.pt", "midas_cls_name": "midas_net.MidasNet", "model_kwargs": {"non_negative": True},
+           "norm_mean": [0.485, 0.456, 0.406], "norm_std": [0.229, 0.224, 0.225], "resize_method": "upper_bound"}
+    
     model = build_model_with_cfg(model_cls=MiDaS_Wrapped, cfg=cfg, weights=None, train=train, num_gpus=num_gpus)
+    return model
+
+
+@register_model(trainable=False)
+def midas_dpt_large_384_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+    assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
+    
+    cfg = {"weights_name": "dpt_large_384.pt", "midas_cls_name": "dpt_depth.DPTDepthModel", "model_kwargs": {"non_negative": True, "backbone": "vitl16_384"},
+           "norm_mean": [0.5, 0.5, 0.5], "norm_std": [0.5, 0.5, 0.5], "resize_method": "minimal"}
+    
+    model = build_model_with_cfg(model_cls=MiDaS_Wrapped, cfg=cfg, weights=None, train=train, num_gpus=num_gpus, )
     return model

@@ -2,7 +2,7 @@
 
 if [ -z "$1" ]
 then
-   echo "Please speficy a target path to this script, e.g.: /setup_mvsnet_pl.sh /path/to/mvsnet_pl";
+   echo "Please specify a target path to this script, e.g.: /setup_mvsnet_pl.sh /path/to/mvsnet_pl";
    exit 1
 fi
 
@@ -12,7 +12,7 @@ TARGET="$1"
 echo "Downloading MVSNet_pl repository https://github.com/kwea123/MVSNet_pl to $TARGET"
 mkdir -p "$1"
 
-git clone https://github.com/kwea123/MVSNet_pl $TARGET
+git clone https://github.com/kwea123/MVSNet_pl "$TARGET"
 
 OLD_PWD="$PWD"
 cd $TARGET

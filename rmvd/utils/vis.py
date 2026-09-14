@@ -8,8 +8,6 @@ from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 import skimage.transform
 
-from .turbo_colormap import cmap as turbo_cmap
-
 
 _DEFAULT_FONT_SIZE = 10
 _DEFAULT_FONT_PATH = '/tmp/OpenSans-Regular.ttf'

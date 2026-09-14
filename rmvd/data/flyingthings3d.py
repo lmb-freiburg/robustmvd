@@ -233,10 +233,10 @@ class FlyingThings3DSeq4Train(FlyingThings3D):
 
     base_dataset = 'flyingthings3d'
     split = 'robust_mvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("flyingthings3d", "train", "root")
+        root = root if root is not None else self._get_root_from_paths_file("flyingthings3d", "train")
         
         sample_confs = self._get_sample_confs()
         filter_hard_samples = False

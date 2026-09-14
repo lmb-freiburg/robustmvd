@@ -12,6 +12,7 @@ def register_model(arg=None, trainable=True):
     def _register_model(model_entrypoint):
         """Register a model."""
         model_name = model_entrypoint.__name__
+        assert model_name not in _model_entrypoints, f'Model "{model_name}" is already registered.'
         _model_entrypoints[model_name] = model_entrypoint
         if trainable:
             _trainable_model_entrypoints[model_name] = model_entrypoint
@@ -36,7 +37,6 @@ def has_model(name, trainable_only=False):
     return has_model
 
 
-def get_model(name):
+def _get_model(name):
     """Get model entrypoint by name."""
-    assert has_model(name), f'The requested model "{name}" does not exist. Available models are: {" ".join(list_models())}'
     return _model_entrypoints[name]

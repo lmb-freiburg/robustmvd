@@ -168,7 +168,8 @@ class BlendedMVSMinDepth:
         with open(pose_path) as pose_file:
             depth_line = pose_file.readlines()[11]
             depths = [float(x) for x in depth_line.split(" ")]
-            min_depth, max_depth = depths[0], depths[-1]
+            min_depth, _ = depths[0], depths[-1]
+            min_depth = np.float32(min_depth)
         return min_depth  # float value
 
 
@@ -181,7 +182,8 @@ class BlendedMVSMaxDepth:
         with open(pose_path) as pose_file:
             depth_line = pose_file.readlines()[11]
             depths = [float(x) for x in depth_line.split(" ")]
-            min_depth, max_depth = depths[0], depths[-1]
+            _, max_depth = depths[0], depths[-1]
+            max_depth = np.float32(max_depth)
         return max_depth  # float value
 
 
@@ -261,15 +263,15 @@ class BlendedMVSSequence:
     
 class BlendedMVS(Dataset):
     
-    def _init_samples(self, scene_names=None, num_source_views=None):
+    def _init_samples(self, scene_names=None, num_source_views=None, all_combinations=True):
         sample_list_path = _get_sample_list_path(self.name)
         if sample_list_path is not None and osp.isfile(sample_list_path):
             super()._init_samples_from_list()
         else:
-            self._init_samples_from_root_dir(scene_names=scene_names, num_source_views=num_source_views)
+            self._init_samples_from_root_dir(scene_names=scene_names, num_source_views=num_source_views, all_combinations=all_combinations)
             self._write_samples_list()
 
-    def _init_samples_from_root_dir(self, scene_names=None, num_source_views=None):
+    def _init_samples_from_root_dir(self, scene_names=None, num_source_views=None, all_combinations=True):
 
         from itertools import combinations
 
@@ -284,7 +286,11 @@ class BlendedMVS(Dataset):
                 all_source_ids = seq.source_ids[key_id]
                 all_source_scores = seq.source_scores[key_id]
                 cur_num_source_views = num_source_views if num_source_views is not None else len(all_source_ids)
-                source_id_combinations = [list(x) for x in list(combinations(all_source_ids, cur_num_source_views))]
+                
+                if all_combinations:
+                    source_id_combinations = [list(x) for x in list(combinations(all_source_ids, cur_num_source_views))]
+                else:
+                    source_id_combinations = [all_source_ids[:cur_num_source_views]]
 
                 for source_ids in source_id_combinations:
                     sample = BlendedMVSSample(name=seq.name + "/key{:06d}".format(key_id), base=seq.name)
@@ -317,10 +323,10 @@ class BlendedMVSSeq4Train(BlendedMVS):  # intentionally not registered as datase
 
     base_dataset = 'blendedmvs'
     split = 'seq4_train'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("blendedmvs", "root")
+        root = root if root is not None else self._get_root_from_paths_file("blendedmvs")
         
         scene_names = BMVS_TRAIN_SCENES
 
@@ -330,13 +336,34 @@ class BlendedMVSSeq4Train(BlendedMVS):  # intentionally not registered as datase
         ]
         layouts = default_layouts + layouts if layouts is not None else default_layouts
 
-        super().__init__(scene_names=scene_names, num_source_views=4, root=root, layouts=layouts, **kwargs)
+        super().__init__(scene_names=scene_names, num_source_views=4, all_combinations=True, root=root, layouts=layouts, **kwargs)
         
         
 @register_default_dataset
 class BlendedMVSSeq4TrainSmall(BlendedMVSSeq4Train):
     split = 'robust_mvd'
 
-    def _init_samples_from_root_dir(self, scene_names=None, num_source_views=None):
-        super()._init_samples_from_root_dir(scene_names=scene_names, num_source_views=num_source_views)
+    def _init_samples_from_root_dir(self, scene_names=None, num_source_views=None, all_combinations=True):
+        super()._init_samples_from_root_dir(scene_names=scene_names, num_source_views=num_source_views, all_combinations=all_combinations)
         self.samples = self.samples[::2]
+
+
+@register_dataset
+class BlendedMVSMVSNetTrain(BlendedMVS):
+
+    base_dataset = 'blendedmvs'
+    split = 'train_mvsnet'
+    data_format = 'mvd'
+
+    def __init__(self, root=None, layouts=None, **kwargs):
+        root = root if root is not None else self._get_root_from_paths_file("blendedmvs")
+        
+        scene_names = BMVS_TRAIN_SCENES
+
+        default_layouts = [
+            MVDUnstructuredDefaultLayout("default", num_views=3, max_views=3),
+            AllImagesLayout("all_images", num_views=3),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(scene_names=scene_names, num_source_views=2, all_combinations=False, root=root, layouts=layouts, **kwargs)

@@ -9,6 +9,7 @@ _loss_entrypoints = {}
 def register_loss(loss_entrypoint):
     """Register a loss."""
     loss_name = loss_entrypoint.__name__
+    assert loss_name not in _loss_entrypoints, f'Loss "{loss_name}" is already registered.'
     _loss_entrypoints[loss_name] = loss_entrypoint
     return loss_entrypoint
 
@@ -25,7 +26,6 @@ def has_loss(name):
     return name in _loss_entrypoints
 
 
-def get_loss(name):
+def _get_loss(name):
     """Get loss entrypoint by name."""
-    assert has_loss(name), f'The requested loss "{name}" does not exist. Available losses are: {" ".join(list_losses())}'
     return _loss_entrypoints[name]

@@ -59,10 +59,10 @@ class TanksAndTemplesTrainRobustMVD(Dataset):
 
     base_dataset = 'tanks_and_temples'
     split = 'robustmvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("tanks_and_temples", "root")
+        root = root if root is not None else self._get_root_from_paths_file("tanks_and_temples")
 
         default_layouts = [
             MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),

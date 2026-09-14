@@ -11,6 +11,7 @@ _scheduler_entrypoints = {}
 def register_optimizer(optimizer_entrypoint):
     """Register an optimizer."""
     optimizer_name = optimizer_entrypoint.__name__
+    assert optimizer_name not in _optimizer_entrypoints, f'Optimizer "{optimizer_name}" is already registered.'
     _optimizer_entrypoints[optimizer_name] = optimizer_entrypoint
     return optimizer_entrypoint
 
@@ -27,15 +28,15 @@ def has_optimizer(name):
     return name in _optimizer_entrypoints
 
 
-def get_optimizer(name):
+def _get_optimizer(name):
     """Get optimizer entrypoint by name."""
-    assert has_optimizer(name), f'The requested optimizer "{name}" does not exist. Available optimizers are: {" ".join(list_optimizers())}'
     return _optimizer_entrypoints[name]
 
 
 def register_scheduler(scheduler_entrypoint):
     """Register a scheduler."""
     scheduler_name = scheduler_entrypoint.__name__
+    assert scheduler_name not in _scheduler_entrypoints, f'Scheduler "{scheduler_name}" is already registered.'
     _scheduler_entrypoints[scheduler_name] = scheduler_entrypoint
     return scheduler_entrypoint
 
@@ -52,7 +53,6 @@ def has_scheduler(name):
     return name in _scheduler_entrypoints
 
 
-def get_scheduler(name):
+def _get_scheduler(name):
     """Get scheduler entrypoint by name."""
-    assert has_scheduler(name), f'The requested scheduler "{name}" does not exist. Available schedulers are: {" ".join(list_schedulers())}'
     return _scheduler_entrypoints[name]

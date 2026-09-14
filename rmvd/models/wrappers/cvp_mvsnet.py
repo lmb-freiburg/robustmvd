@@ -3,14 +3,13 @@ import math
 
 import torch
 import torch.nn as nn
-from torchvision import transforms as T
 import numpy as np
 from easydict import EasyDict
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
+from .utils import get_repo_path
 from rmvd.utils import (
-    get_path,
     get_torch_model_device,
     to_numpy,
     to_torch,
@@ -21,13 +20,13 @@ from rmvd.data.transforms import ResizeInputs
 
 
 class CVPMVSNet_Wrapped(nn.Module):
-    def __init__(self, num_sampling_steps=192):
+    
+    def __init__(self):
         super().__init__()
 
         import sys
 
-        paths_file = osp.join(osp.dirname(osp.realpath(__file__)), "paths.toml")
-        repo_path = get_path(paths_file, "cvp_mvsnet", "root")
+        repo_path = get_repo_path("cvp_mvsnet")
         sys.path.insert(0, osp.join(repo_path, "CVP_MVSNet"))
 
         from models.net import network
@@ -43,13 +42,12 @@ class CVPMVSNet_Wrapped(nn.Module):
         ]
         self.model.load_state_dict(state_dict, strict=False)
 
-        self.num_sampling_steps = num_sampling_steps
-
     def input_adapter(
         self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None  # TODO: does it make sense that poses etc are set to None?
     ):
         device = get_torch_model_device(self)
 
+        N = images[0].shape[0]
         orig_ht, orig_wd = images[0].shape[-2:]
         ht, wd = int(math.ceil(orig_ht / 64.0) * 64.0), int(
             math.ceil(orig_wd / 64.0) * 64.0
@@ -64,13 +62,12 @@ class CVPMVSNet_Wrapped(nn.Module):
         # normalize images
         images = [image / 255.0 for image in images]
 
-        depth_range = [np.array([0.2]), np.array([100])] if depth_range is None else depth_range
-        min_depth, max_depth = depth_range
+        if depth_range is None:
+            depth_range = [np.full((N,), 0.2, dtype=np.float32), np.full((N,), 100., dtype=np.float32)]
+        min_depth, max_depth = depth_range  # each: N
 
         images, keyview_idx, poses, intrinsics, min_depth, max_depth = to_torch(
             (images, keyview_idx, poses, intrinsics, min_depth, max_depth), device=device)
-
-        # TODO: check min_depth, max_depth dtype with given or default depth range
 
         sample = {
             "images": images,
@@ -133,9 +130,7 @@ def cvp_mvsnet_wrapped(
         weights is None
     ), "Model supports only pretrained=True, weights=None."
 
-    cfg = {
-        "num_sampling_steps": 192,
-    }
+    cfg = {}
 
     model = build_model_with_cfg(
         model_cls=CVPMVSNet_Wrapped,

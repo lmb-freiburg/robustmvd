@@ -1,4 +1,4 @@
-from .registry import get_loss
+from .registry import _get_loss, has_loss, list_losses
 
 
 def create_loss(name, **kwargs):
@@ -10,6 +10,7 @@ def create_loss(name, **kwargs):
     Keyword Args:
         **kwargs: Additional arguments to pass to the loss.
     """
-    loss_entrypoint = get_loss(name=name)
+    assert has_loss(name), f'The requested loss "{name}" does not exist. Available losses are: {" ".join(list_losses())}'
+    loss_entrypoint = _get_loss(name=name)
     loss = loss_entrypoint(**kwargs)
     return loss

@@ -6,17 +6,17 @@ import numpy as np
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
-from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
+from .utils import get_repo_path
+from rmvd.utils import get_torch_model_device, to_numpy, to_torch, select_by_index, logging
 from rmvd.data.transforms import ResizeInputs
 
 
 class Monodepth2_Wrapped(nn.Module):
-    def __init__(self, model_name, trained_on_stereo):
+    def __init__(self, model_name, trained_on_stereo, post_uncertainty=False):
         super().__init__()
 
         import sys
-        paths_file = osp.join(osp.dirname(osp.realpath(__file__)), 'paths.toml')
-        repo_path = get_path(paths_file, "monodepth2", "root")
+        repo_path = get_repo_path("monodepth2")
         sys.path.insert(0, repo_path)
         import networks
 
@@ -32,7 +32,7 @@ class Monodepth2_Wrapped(nn.Module):
             f"from https://github.com/nianticlabs/monodepth2 and extract it to" \
             f"{osp.join(repo_path, 'models')}"
 
-        print(f"Using model weights from {encoder_weights_path} and {decoder_weights_path}.")
+        logging.info(f"Using model weights from {encoder_weights_path} and {decoder_weights_path}.")
         encoder_weights = torch.load(encoder_weights_path)
         filtered_encoder_weights = {k: v for k, v in encoder_weights.items() if k in self.encoder.state_dict()}
         self.encoder.load_state_dict(filtered_encoder_weights)
@@ -44,6 +44,7 @@ class Monodepth2_Wrapped(nn.Module):
         self.width = encoder_weights['width']
 
         self.trained_on_stereo = trained_on_stereo
+        self.post_uncertainty = post_uncertainty
 
     def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
         device = get_torch_model_device(self)
@@ -62,6 +63,10 @@ class Monodepth2_Wrapped(nn.Module):
         return sample
 
     def forward(self, image, **_):
+        if self.post_uncertainty:
+            image_flipped = torch.flip(image, dims=[3])
+            image = torch.cat([image, image_flipped], dim=0)
+        
         features = self.encoder(image)
         outputs = self.decoder(features)
         disp = outputs[("disp", 0)]
@@ -73,14 +78,39 @@ class Monodepth2_Wrapped(nn.Module):
         if self.trained_on_stereo:
             stereo_scale_factor = 5.4
             scaled_disp = scaled_disp / stereo_scale_factor
+            
+        if self.post_uncertainty:
+            scaled_disp_orig, scaled_disp_flipped = torch.split(scaled_disp, image.shape[0] // 2, dim=0)
+            scaled_disp_flipped = torch.flip(scaled_disp_flipped, dims=[3])
+            depth_uncertainty = torch.abs(scaled_disp_orig - scaled_disp_flipped)
+            h, w = image.shape[-2:]
+            l, _ = np.meshgrid(np.linspace(0, 1, w), np.linspace(0, 1, h))
+            l_mask = (1.0 - np.clip(20 * (l - 0.05), 0, 1))[None, None, ...]
+            r_mask = (l_mask[:, :, :, ::-1]).copy()
+            l_mask = torch.from_numpy(l_mask).to(image.device)
+            r_mask = torch.from_numpy(r_mask).to(image.device)
+            scaled_disp = r_mask * scaled_disp_orig + l_mask * scaled_disp_flipped + (1.0 - l_mask - r_mask) * 0.5 * (scaled_disp_orig + scaled_disp_flipped)
+        
+        depth = 1 / (scaled_disp + 1e-9)
 
-        pred = {'depth': 1 / (scaled_disp + 1e-9)}
+        pred = {'depth': depth}
+        if self.post_uncertainty:
+            pred ['depth_uncertainty'] = depth_uncertainty
+            
         aux = {}
         return pred, aux
 
     def output_adapter(self, model_output):
         pred, aux = model_output
         return to_numpy(pred), to_numpy(aux)
+
+
+@register_model(trainable=False)
+def monodepth2_mono_stereo_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+    assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
+    cfg = {"model_name": "mono+stereo_640x192", "trained_on_stereo": True}
+    model = build_model_with_cfg(model_cls=Monodepth2_Wrapped, cfg=cfg, weights=None, train=train, num_gpus=num_gpus)
+    return model
 
 
 @register_model(trainable=False)
@@ -92,8 +122,8 @@ def monodepth2_mono_stereo_1024x320_wrapped(pretrained=True, weights=None, train
 
 
 @register_model(trainable=False)
-def monodepth2_mono_stereo_640x192_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+def monodepth2_postuncertainty_mono_stereo_wrapped(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
     assert pretrained and (weights is None), "Model supports only pretrained=True, weights=None."
     cfg = {"model_name": "mono+stereo_640x192", "trained_on_stereo": True}
-    model = build_model_with_cfg(model_cls=Monodepth2_Wrapped, cfg=cfg, weights=None, train=train, num_gpus=num_gpus)
+    model = build_model_with_cfg(model_cls=Monodepth2_Wrapped, cfg=cfg, weights=None, train=train, num_gpus=num_gpus, post_uncertainty=True)
     return model

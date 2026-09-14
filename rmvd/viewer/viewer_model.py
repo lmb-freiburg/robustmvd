@@ -1,3 +1,6 @@
+from pprint import pprint
+
+
 class ViewerModel:
     def __init__(self, dataset, layout=None):
         self._dataset = dataset
@@ -35,4 +38,14 @@ class ViewerModel:
         """Returns the display data for the given index."""
         data = self._dataset[index]
         display_data = self._layout.load(data)
+        
+        info_dict = {}                                                                                                                                                                
+        for key, val in data.items():
+            if key.startswith('_'):
+                info_dict[key] = val 
+            if key == "depth_range":
+                info_dict["GT depth range"] = val
+        print("Current sample info:")
+        pprint(info_dict)
+
         return display_data

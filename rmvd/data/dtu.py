@@ -92,10 +92,29 @@ class DTURobustMVD(Dataset):
 
     base_dataset = 'dtu'
     split = 'robustmvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("dtu", "root")
+        root = root if root is not None else self._get_root_from_paths_file("dtu")
+
+        default_layouts = [
+            MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),
+            AllImagesLayout("all_images", num_views=11),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)
+
+
+@register_dataset
+class DTURobustMVDPaper(Dataset):
+
+    base_dataset = 'dtu'
+    split = 'robustmvd_paper'
+    data_format = 'mvd'
+
+    def __init__(self, root=None, layouts=None, **kwargs):
+        root = root if root is not None else self._get_root_from_paths_file("dtu")
 
         default_layouts = [
             MVDUnstructuredDefaultLayout("default", num_views=11, max_views=4),

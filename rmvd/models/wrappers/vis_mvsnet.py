@@ -8,8 +8,8 @@ import numpy as np
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
+from .utils import get_repo_path
 from rmvd.utils import (
-    get_path,
     get_torch_model_device,
     to_numpy,
     to_torch,
@@ -25,8 +25,7 @@ class VisMVSNet_Wrapped(nn.Module):
 
         import sys
 
-        paths_file = osp.join(osp.dirname(osp.realpath(__file__)), "paths.toml")
-        repo_path = get_path(paths_file, "vis_mvsnet", "root")
+        repo_path = get_repo_path("vis_mvsnet")
         sys.path.insert(0, repo_path)
 
         from core.model_cas import Model
@@ -53,6 +52,7 @@ class VisMVSNet_Wrapped(nn.Module):
     ):
         device = get_torch_model_device(self)
 
+        N = images[0].shape[0]
         orig_ht, orig_wd = images[0].shape[-2:]
         ht, wd = int(math.ceil(orig_ht / 64.0) * 64.0), int(
             math.ceil(orig_wd / 64.0) * 64.0
@@ -75,22 +75,22 @@ class VisMVSNet_Wrapped(nn.Module):
             image_batch = torch.stack(tmp_images)
             images[idx] = image_batch
 
-        depth_range = [0.2, 100] if depth_range is None else depth_range
+        if depth_range is None:
+            depth_range = [np.full((N,), 0.2, dtype=np.float32), np.full((N,), 100., dtype=np.float32)]
         min_depth, max_depth = depth_range
         step_size = (max_depth - min_depth) / self.num_sampling_steps
 
         cams = []
-        for idx, (intrinsic, pose) in enumerate(zip(intrinsics, poses)):
+        for intrinsic, pose in zip(intrinsics, poses):
 
-            cam = np.zeros((2, 4, 4), dtype=np.float32)
-            cam[0] = pose
-            cam[1, :3, :3] = intrinsic
-            cam[1, 3, 0] = min_depth
-            cam[1, 3, 1] = step_size
-            cam[1, 3, 2] = self.num_sampling_steps
-            cam[1, 3, 3] = max_depth
+            cam = np.zeros((N, 2, 4, 4), dtype=np.float32)  # N, 2, 4, 4
+            cam[:, 0] = pose
+            cam[:, 1, :3, :3] = intrinsic
+            cam[:, 1, 3, 0] = min_depth
+            cam[:, 1, 3, 1] = step_size
+            cam[:, 1, 3, 2] = self.num_sampling_steps
+            cam[:, 1, 3, 3] = max_depth
 
-            cam = cam[np.newaxis, :]  # 1, 2, 4, 4
             cams.append(cam)
 
         images, keyview_idx, cams = to_torch((images, keyview_idx, cams), device=device)

@@ -12,6 +12,7 @@ from .dataset import Dataset, Sample, _get_sample_list_path
 from .registry import register_default_dataset
 from .layouts import MVDUnstructuredDefaultLayout, AllImagesLayout
 from .flyingthings3d import SUBSET_FILTERED_SAMPLES, HARD_SAMPLES
+from rmvd.utils import logging
 
 
 def readFloat(name):
@@ -210,11 +211,11 @@ class StaticThings3D(Dataset):
         path = _get_sample_list_path(self.name) if path is None else path
         if osp.isdir(osp.split(path)[0]):
             if self.verbose:
-                print(f"Writing sample list to {path}")
+                logging.info(f"Writing sample list to {path}")
             with open(path, 'wb') as file:
                 pickle.dump(self.samples, file)
         elif self.verbose:
-            print(f"Could not write sample list to {path}")
+            logging.info(f"Could not write sample list to {path}")
 
 
 @register_default_dataset
@@ -222,10 +223,10 @@ class StaticThings3DSeq4Train(StaticThings3D):
 
     base_dataset = 'staticthings3d'
     split = 'robust_mvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("staticthings3d", "train", "root")
+        root = root if root is not None else self._get_root_from_paths_file("staticthings3d", "train")
         
         sample_confs = self._get_sample_confs()
         filter_hard_samples = True

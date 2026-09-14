@@ -2,7 +2,7 @@ import os
 import os.path as osp
 import time
 from copy import deepcopy
-from typing import Optional, Sequence, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import pickle
 
 import torch
@@ -10,7 +10,7 @@ import skimage.transform
 import numpy as np
 import pandas as pd
 
-from rmvd.utils import numpy_collate, vis, select_by_index, get_full_class_name
+from rmvd.utils import numpy_collate, vis, select_by_index, exclude_index, writer, logging, trans_from_transform, invert_transform, count_torch_model_parameters
 from rmvd.data.layout import Layout, Visualization
 from .metrics import m_rel_ae, pointwise_rel_ae, thresh_inliers, sparsification
 from rmvd.data.updates import Update
@@ -37,13 +37,17 @@ class MultiViewDepthEvaluation:
         inputs: List of input modalities that are supplied to the model.
             Can include: ["images", "intrinsics", "poses", "depth_range"].
             Default: ["images"]
-        alignment: Alignment between predicted and ground truth depths. Options are None, "median", "translation".
+        alignment: Alignment between predicted and ground truth depths. Options are None, "median",
+            "pose_scale_mean", "pose_scale_median", "scale_shift_least_squares_invdepth".
             None evaluates predictions without any alignment.
             "median" scales predicted depth maps with the ratio of medians of predicted and ground truth depth maps.
-            "translation" scales predicted depth maps with the ratio of the predicted and ground truth translation.
+            "pose_scale_*" scales predicted depth maps based on the ratio of the scales of the predicted and ground truth poses.
+            "scale_shift_least_squares_invdepth" scales and shifts predicted depth maps to minimize
+            the squared error between predicted and ground truth inverse depths.
+            Default: None.
         max_source_views: Maximum number of source views to be considered. None means all available source views are
             considered. Default: None.
-        min_source_views. Minimum number of source views provided to the model.
+        min_source_views: Minimum number of source views provided to the model.
             If max_source_views is not None, is set to min(min_source_views, max_source_views). Default: 1.
         view_ordering: Ordering of source views during the evaluation.
             Options are "quasi-optimal" and "nearest". Default: "quasi-optimal".
@@ -60,19 +64,21 @@ class MultiViewDepthEvaluation:
         clip_pred_depth: Clip model predictions before evaluation to a reasonable range. This makes sense to reduce
             the effect of unreasonable outliers. Defaults to True.
         sparse_pred: Predicted depth is sparse. Invalid predictions are indicated by 0 values and ignored in
-            the evaluation. Defaults to True.
+            the evaluation. Defaults to False.
+        num_workers: Number of workers for the dataloader. Default: 4.
         verbose: Print evaluation details.
     """
     def __init__(self,
                  out_dir: Optional[str] = None,
-                 inputs: Sequence[str] = None,
+                 inputs: Optional[List[str]] = None,
                  alignment: Optional[str] = None,
                  max_source_views: Optional[int] = None,
                  min_source_views: int = 1,
-                 view_ordering: str = "quasi-optimal",
+                 view_ordering: Optional[str] = "quasi-optimal",
                  eval_uncertainty: bool = True,
-                 clip_pred_depth: Union[bool, Tuple[float, float]] = True,
+                 clip_pred_depth: Union[bool, Tuple[float, float], List[float]] = True,
                  sparse_pred: bool = False,
+                 num_workers: int = 4,
                  verbose: bool = True,
                  **_
                  ):
@@ -80,19 +86,29 @@ class MultiViewDepthEvaluation:
         self.verbose = verbose
 
         if self.verbose:
-            print(f"Initializing evaluation {self.name}.")
+            logging.info(f"Initializing evaluation {self.name}.")
 
         self.out_dir = out_dir
         if self.out_dir is not None:
-            self.quantitatives_dir = osp.join(self.out_dir, "quantitative")
+            self.quantitatives_dir = osp.join(self.out_dir)
             self.sample_results_dir = osp.join(self.quantitatives_dir, "per_sample")
             self.qualitatives_dir = osp.join(self.out_dir, "qualitative")
+            self.results_file = osp.join(self.quantitatives_dir, ".results_df.pickle")
+            self.log_file_path = osp.join(self.out_dir, "log.txt")
             os.makedirs(self.out_dir, exist_ok=True)
             os.makedirs(self.quantitatives_dir, exist_ok=True)
             os.makedirs(self.sample_results_dir, exist_ok=True)
             os.makedirs(self.qualitatives_dir, exist_ok=True)
+            logging.add_log_file(self.log_file_path, flush_line=True)
+        else:
+            self.quantitatives_dir = None
+            self.sample_results_dir = None
+            self.qualitatives_dir = None
+            self.results_file = None
+            self.log_file_path = None
 
         self.inputs = list(set(inputs + ["images"])) if inputs is not None else ["images"]
+        assert alignment in [None, "median", "scale_shift_least_squares_invdepth", "pose_scale_mean", "pose_scale_median"]
         self.alignment = alignment
         self.max_source_views = max_source_views
         self.min_source_views = min_source_views if max_source_views is None else min(min_source_views, max_source_views)
@@ -100,12 +116,15 @@ class MultiViewDepthEvaluation:
         self.eval_uncertainty = eval_uncertainty
         self.clip_pred_depth = clip_pred_depth
         self.sparse_pred = sparse_pred
+        self.num_workers = num_workers
+        self.cuda_is_available = torch.cuda.is_available()
 
         # will be set/used in __call__:
         self.dataset = None
         self.dataloader = None
         self.model = None
-        self.exp_name = None
+        self.eval_name = None
+        self.finished_iterations = None
         self.sample_indices = None
         self.qualitative_indices = None
         self.burn_in_samples = None
@@ -116,9 +135,13 @@ class MultiViewDepthEvaluation:
         self.dataset_updates = None
 
         if self.verbose:
-            print(self)
-            print(f"Finished initializing evaluation {self.name}.")
-            print()
+            logging.info(self)
+            logging.info(f"Finished initializing evaluation {self.name}.")
+            logging.info()
+            
+    def __del__(self):
+        if self.log_file_path is not None and logging is not None:
+            logging.remove_log_file(self.log_file_path)
 
     @property
     def name(self):
@@ -144,10 +167,11 @@ class MultiViewDepthEvaluation:
     def __call__(self,
                  dataset,
                  model,
-                 samples: Optional[Union[int, Sequence[int]]] = None,
-                 qualitatives: Union[int, Sequence[int]] = 10,
+                 samples: Optional[Union[int, List[int]]] = None,
+                 qualitatives: Optional[Union[int, List[int]]] = 10,
                  burn_in_samples: int = 3,
-                 exp_name: Optional[str] = None,
+                 eval_name: Optional[str] = None,
+                 finished_iterations: Optional[int] = None,
                  **_):
         """Run depth evaluation for a dataset and model.
 
@@ -160,13 +184,19 @@ class MultiViewDepthEvaluation:
                 the indices of samples for which qualitatives should be logged. -1 logs qualitatives for all samples.
             burn_in_samples: Number of samples that will not be considered for runtime/memory measurements.
                 Defaults to 3.
-            exp_name: Name of the experiment. Optional.
+            eval_name: Name of the experiment. Optional.
+            finished_iterations: Number of iterations that the model has been trained for. Optional.
 
         Returns:
             Results of the evaluation.
         """
+        if self.results_file is not None and osp.exists(self.results_file):
+            logging.info(f"Skipping evaluation {self.name} because it is already finished.")
+            results = pd.read_pickle(self.results_file)
+            return results
+        
         self._init_evaluation(dataset=dataset, model=model, samples=samples, qualitatives=qualitatives,
-                              burn_in_samples=burn_in_samples, exp_name=exp_name)
+                              burn_in_samples=burn_in_samples, eval_name=eval_name, finished_iterations=finished_iterations)
         results = self._evaluate()
         self._output_results()
         self._reset_evaluation()
@@ -178,15 +208,17 @@ class MultiViewDepthEvaluation:
                          samples=None,
                          qualitatives=10,
                          burn_in_samples=3,
-                         exp_name=None,):
+                         eval_name=None,
+                         finished_iterations=None,):
         self.dataset = dataset
         self.model = model
-        self.exp_name = exp_name
+        self.eval_name = eval_name
+        self.finished_iterations = finished_iterations
         self._init_sample_indices(samples=samples)
         self._init_qualitative_indices(qualitatives=qualitatives)
         self._init_results()
         self.burn_in_samples = burn_in_samples
-        self.dataloader = self.dataset.get_loader(batch_size=1, indices=self.sample_indices, num_workers=0,
+        self.dataloader = self.dataset.get_loader(batch_size=1, indices=self.sample_indices, num_workers=self.num_workers,
                                                   collate_fn=numpy_collate)
         # we fix a batch_size=1 to ensure comparable runtimes
 
@@ -194,12 +226,12 @@ class MultiViewDepthEvaluation:
         if isinstance(samples, list):
             self.sample_indices = samples
             if self.verbose:
-                print(f"Evaluating samples with indices: {self.sample_indices}.")
+                logging.info(f"Evaluating samples with indices: {self.sample_indices}.")
         elif isinstance(samples, int) and samples > 0:
             step_size = len(self.dataset) / samples  # <=1
             self.sample_indices = [int(i*step_size) for i in range(samples)]
             if self.verbose:
-                print(f"Evaluating samples with indices: {self.sample_indices}.")
+                logging.info(f"Evaluating samples with indices: {self.sample_indices}.")
         else:
             self.sample_indices = list(range(len(self.dataset)))
 
@@ -222,8 +254,8 @@ class MultiViewDepthEvaluation:
             self.cur_sample_idx = sample_idx
 
             if self.verbose:
-                print(f"Processing sample {self.cur_sample_num+1} / {len(self.sample_indices)} "
-                      f"(index: {self.cur_sample_idx}):")
+                logging.info(f"Processing sample {self.cur_sample_num+1} / {len(self.sample_indices)} "
+                             f"(index: {self.cur_sample_idx}):")
 
             # prepare sample:
             should_qualitative = (self.cur_sample_idx in self.qualitative_indices) and (self.out_dir is not None)
@@ -244,13 +276,13 @@ class MultiViewDepthEvaluation:
                 cur_view_indices = list(sorted([keyview_idx] + cur_source_indices))
 
                 if self.verbose:
-                    print(f"\tEvaluating with {num_source_views} / {max_source_views} source views:")
-                    print(f"\t\tSource view indices: {cur_source_indices}.")
+                    logging.info(f"\tEvaluating with {num_source_views} / {max_source_views} source views:")
+                    logging.info(f"\t\tSource view indices: {cur_source_indices}.")
 
                 self._reset_memory_stats()
 
                 # construct current input sample:
-                cur_sample_gt = deepcopy(sample_gt)
+                cur_sample_gt = filter_views_in_sample(sample=sample_gt, indices_to_keep=cur_view_indices)
                 cur_sample_inputs = filter_views_in_sample(sample=sample_inputs, indices_to_keep=cur_view_indices)
 
                 # run model:
@@ -266,7 +298,7 @@ class MultiViewDepthEvaluation:
                 self._log_metrics(metrics, num_source_views)
 
                 if self.verbose:
-                    print(f"\t\tAbsrel={metrics['absrel']}.")
+                    logging.info(f"\t\tAbsrel={metrics['absrel']}.")
 
                 if np.isfinite(metrics['absrel']) and \
                         (best_metrics is None or metrics['absrel'] < best_metrics['absrel']):
@@ -292,8 +324,8 @@ class MultiViewDepthEvaluation:
                 self._add_dataset_update(best_metrics)
 
             if self.verbose:
-                print(f"Sample with index {self.cur_sample_idx} has AbsRel={best_metrics['absrel']} "
-                      f"with {best_metrics['num_views']} source views.\n")
+                logging.info(f"Sample with index {self.cur_sample_idx} has AbsRel={best_metrics['absrel']} "
+                             f"with {best_metrics['num_views']} source views.\n")
 
         return self.results
 
@@ -337,7 +369,8 @@ class MultiViewDepthEvaluation:
         self.dataset = None
         self.dataloader = None
         self.model = None
-        self.exp_name = None
+        self.eval_name = None
+        self.finished_iterations = None
         self.sample_indices = None
         self.qualitative_indices = None
         self.burn_in_samples = None
@@ -381,7 +414,7 @@ class MultiViewDepthEvaluation:
         for source_idx in source_indices:
             # construct temporary sample with a single source view:
             indices_to_keep = [keyview_idx, source_idx]
-            cur_sample_gt = deepcopy(sample_gt)
+            cur_sample_gt = filter_views_in_sample(sample=sample_gt, indices_to_keep=indices_to_keep)
             cur_sample_inputs = filter_views_in_sample(sample=sample_inputs, indices_to_keep=indices_to_keep)
 
             # run model:
@@ -397,14 +430,19 @@ class MultiViewDepthEvaluation:
         return source_view_ordering
 
     def _reset_memory_stats(self):
-        torch.cuda.empty_cache()
+        if not self.cuda_is_available:
+            return
         torch.cuda.reset_peak_memory_stats()
-        torch.cuda.reset_accumulated_memory_stats()
+
+    def _cuda_synchronize(self):
+        if self.cuda_is_available:
+            torch.cuda.synchronize()
 
     def _inputs_and_gt_from_sample(self, sample):
         is_input = lambda key: key in self.inputs or key == "keyview_idx"
+        is_gt = lambda key: key not in self.inputs or key == "keyview_idx"
         sample_inputs = {key: val for key, val in sample.items() if is_input(key)}
-        sample_gt = {key: val for key, val in sample.items() if not is_input(key)}
+        sample_gt = {key: val for key, val in sample.items() if is_gt(key)}
         return sample_inputs, sample_gt
 
     def _postprocess_sample_and_output(self, sample_inputs, sample_gt, pred):
@@ -428,7 +466,7 @@ class MultiViewDepthEvaluation:
 
             pred['scaling_factor'] = ratio
 
-        elif self.alignment == 'least_squares_scale_shift':
+        elif self.alignment == 'scale_shift_least_squares_invdepth':
             mask = gt_mask & pred_mask
             with np.errstate(divide='ignore', invalid='ignore'):
                 pred_invdepth = np.nan_to_num(1 / pred_depth, nan=0, posinf=0, neginf=0)
@@ -469,8 +507,50 @@ class MultiViewDepthEvaluation:
             del gt_invdepth
             pred['least_squares_scale'] = scale
             pred['least_squares_shift'] = shift
+            
+        elif self.alignment in ["pose_scale_mean", "pose_scale_median"]:
+            assert "poses" not in sample_inputs, f"{self.alignment} is only allowed if poses are not provided as input to the model."
+            assert "poses" in sample_gt, f"{self.alignment} is only possible if poses are available in the ground truth."
+            assert "poses" in pred, f"{self.alignment} is only possible if poses are available in the predictions."
 
-        if isinstance(self.clip_pred_depth, tuple):
+            keyview_idx = sample_inputs['keyview_idx']
+            gt_poses = sample_gt['poses']
+            pred_poses = pred['poses']
+            assert gt_poses[0].shape[0] == 1, "Alignment is implemented only for batch size 1 (np.linalg.norm is applied over whole array and not over each batch separately)."
+
+            # Make all poses relative to the keyview:
+            gt_key_to_ref_transform = select_by_index(gt_poses, keyview_idx)
+            gt_ref_to_key_transform = invert_transform(gt_key_to_ref_transform)
+            gt_poses = [gt_view_to_ref_transform @ gt_ref_to_key_transform for gt_view_to_ref_transform in gt_poses]
+
+            pred_key_to_ref_transform = select_by_index(pred_poses, keyview_idx)
+            pred_ref_to_key_transform = invert_transform(pred_key_to_ref_transform)
+            pred_poses = [pred_view_to_ref_transform @ pred_ref_to_key_transform for pred_view_to_ref_transform in pred_poses]
+
+            # Get the magnitudes of the translations of the source views relative to the keyview:
+            gt_source_view_to_key_transforms = exclude_index(gt_poses, keyview_idx)
+            pred_source_view_to_key_transforms = exclude_index(pred_poses, keyview_idx)
+            gt_source_view_to_key_translations = [trans_from_transform(transform) for transform in gt_source_view_to_key_transforms]
+            pred_source_view_to_key_translations = [trans_from_transform(transform) for transform in pred_source_view_to_key_transforms]
+            gt_source_view_to_key_translation_mags = [np.linalg.norm(translation) for translation in gt_source_view_to_key_translations]
+            pred_source_view_to_key_translation_mags = [np.linalg.norm(translation) for translation in pred_source_view_to_key_translations]
+
+            # Compute the scaling factor based on the ratios between GT and predicted translation magnitudes:
+            translation_mag_ratios = np.array(gt_source_view_to_key_translation_mags) / np.array(pred_source_view_to_key_translation_mags)
+            translation_mag_ratios = translation_mag_ratios[np.isfinite(translation_mag_ratios)]
+            if self.alignment == 'pose_scale_mean':
+                ratio = np.mean(translation_mag_ratios)
+            elif self.alignment == 'pose_scale_median':
+                ratio = np.median(translation_mag_ratios)
+
+            if np.isfinite(ratio):
+                pred_depth = pred_depth * ratio
+            else:
+                ratio = np.nan
+
+            pred['scaling_factor'] = ratio
+
+        if isinstance(self.clip_pred_depth, tuple) or isinstance(self.clip_pred_depth, list):
             pred_depth = np.clip(pred_depth, self.clip_pred_depth[0], self.clip_pred_depth[1]) * pred_mask
         elif self.clip_pred_depth:
             pred_depth = np.clip(pred_depth, 0.1, 100) * pred_mask
@@ -488,19 +568,23 @@ class MultiViewDepthEvaluation:
         pred['invdepth'] = pred_invdepth
 
     def _run_model(self, sample_inputs):
-        start_model_and_io = time.time()
+        self._cuda_synchronize()
+        start_model_and_io = time.perf_counter()
 
         if hasattr(self.model, "input_adapter"):
             sample_inputs = self.model.input_adapter(**sample_inputs)
 
-        start_model = time.time()
+        self._cuda_synchronize()
+        start_model = time.perf_counter()
         pred = self.model(**sample_inputs)
-        end_model = time.time()
+        self._cuda_synchronize()
+        end_model = time.perf_counter()
 
         if hasattr(self.model, "output_adapter"):
             pred, _ = self.model.output_adapter(pred)
 
-        end_model_and_io = time.time()
+        self._cuda_synchronize()
+        end_model_and_io = time.perf_counter()
 
         time_and_mem_valid = self.cur_sample_num >= self.burn_in_samples
         runtime_model_in_sec = end_model - start_model if time_and_mem_valid else np.nan
@@ -510,9 +594,10 @@ class MultiViewDepthEvaluation:
                     'runtime_model_and_io_in_sec': runtime_model_and_io_in_sec,
                     'runtime_model_and_io_in_msec': 1000 * runtime_model_and_io_in_sec,}
 
-        gpu_mem_alloc = int(torch.cuda.max_memory_allocated() / 1024 / 1024) if time_and_mem_valid else np.nan
-        gpu_mem_reserved = int(torch.cuda.max_memory_reserved() / 1024 / 1024) if time_and_mem_valid else np.nan
-        gpu_mem = {'gpu_mem_alloc_in_mib': gpu_mem_alloc, 'gpu_mem_alloc_in_mib': gpu_mem_reserved}
+        mem_valid = time_and_mem_valid and self.cuda_is_available
+        gpu_mem_alloc = int(torch.cuda.max_memory_allocated() / 1024 / 1024) if mem_valid else np.nan
+        gpu_mem_alloc = gpu_mem_alloc if gpu_mem_alloc > 0 else np.nan
+        gpu_mem = {'gpu_mem_alloc_in_mib': gpu_mem_alloc}
 
         return pred, runtimes, gpu_mem
 
@@ -523,14 +608,20 @@ class MultiViewDepthEvaluation:
         eval_mask = pred_depth != 0 if self.sparse_pred else np.ones_like(pred_depth, dtype=bool)
 
         absrel = m_rel_ae(gt=gt_depth, pred=pred_depth, mask=eval_mask, output_scaling_factor=100.0)
-        inliers103 = thresh_inliers(gt=gt_depth, pred=pred_depth, thresh=1.03, mask=eval_mask, output_scaling_factor=100.0)
 
-        metrics = {'absrel': absrel, 'inliers103': inliers103,}
+        metrics = {'absrel': absrel}
 
-        if self.alignment == "median":
+        # inlier ratios for the thresholds 1.03 (Robust MVD Benchmark), 1.05 (SimpleRecon) and
+        # 1.25^1/1.25^2/1.25^3 (Eigen et al.):
+        for inlier_metric, thresh in [('inliers103', 1.03), ('inliers105', 1.05), ('inliers125', 1.25),
+                                      ('inliers156', 1.25 ** 2), ('inliers195', 1.25 ** 3)]:
+            metrics[inlier_metric] = thresh_inliers(gt=gt_depth, pred=pred_depth, thresh=thresh, mask=eval_mask,
+                                                    output_scaling_factor=100.0)
+
+        if self.alignment in ["median", "pose_scale_mean", "pose_scale_median"]:
             metrics['scaling_factor'] = pred['scaling_factor']
 
-        if self.alignment == "least_squares_scale_shift":
+        if self.alignment == "scale_shift_least_squares_invdepth":
             metrics['least_squares_scale'] = pred['least_squares_scale']
             metrics['least_squares_shift'] = pred['least_squares_shift']
 
@@ -545,7 +636,7 @@ class MultiViewDepthEvaluation:
 
     def _compute_uncertainty_metrics(self, sample_inputs, sample_gt, pred):
         if self.verbose:
-            print("\tComputing uncertainty metrics:")
+            logging.info("\tComputing uncertainty metrics:")
 
         gt_depth = sample_gt['depth'][0, 0]
 
@@ -563,6 +654,7 @@ class MultiViewDepthEvaluation:
                                              pbar_desc="            Prediction sparsification")
         sparsification_errors = sparsification_pred - sparsification_oracle
         ause = sparsification_errors.sum(skipna=False) / 100
+        ause_unnormalized = ause * m_rel_ae(gt=gt_depth, pred=pred_depth, mask=pred_mask)
         ause = ause if np.isfinite(ause) else np.nan
 
         self.sparsification_curves.loc[(self.cur_sample_idx, "oracle"), :] = sparsification_oracle
@@ -570,27 +662,37 @@ class MultiViewDepthEvaluation:
         self.sparsification_curves.loc[(self.cur_sample_idx, "error"), :] = sparsification_errors
 
         if self.verbose:
-            print(f"\t\t\tAUSE={ause}.")
+            logging.info(f"\t\t\tAUSE={ause}.")
 
-        return {'ause': ause}
+        return {'ause': ause, 'ause_unnormalized': ause_unnormalized}
 
     def _output_results(self):
 
         results_per_sample = self.results['best']
         results = results_per_sample.mean()
+        num_model_params = count_torch_model_parameters(self.model)
+        results['num_model_params'] = num_model_params if num_model_params > 0 else np.nan
 
         num_source_view_results_per_sample = self.results.drop('best', axis=1, level=0)
         num_source_view_results = num_source_view_results_per_sample.mean()
 
+        # Print results:
         if self.verbose:
-            print()
-            print("Results:")
-            print(results)
+            logging.info()
+            logging.info("Results:")
+            logging.info(results)
+            
+        # Log results:
+        log_name = f"eval/{self.dataset.name}"
+        log_name = log_name + f"/{self.eval_name}" if self.eval_name is not None else log_name
+        writer.put_scalar_dict(name=log_name, scalar=results.to_dict(), step=self.finished_iterations)
+        writer.write_out_storage()
 
+        # Write results to disk:
         if self.out_dir is not None:
 
             if self.verbose:
-                print(f"Writing results to {self.out_dir}.")
+                logging.info(f"Writing results to {self.out_dir}.")
 
             results_per_sample.to_pickle(osp.join(self.sample_results_dir, "results.pickle"))
             results_per_sample.to_csv(osp.join(self.sample_results_dir, "results.csv"))
@@ -612,10 +714,12 @@ class MultiViewDepthEvaluation:
                 sample_sparsification_curves.to_csv(osp.join(self.sample_results_dir, "sparsification_curves.csv"))
 
             self._output_dataset_cfg()
-
+            
+            self.results.to_pickle(self.results_file)
+            
     def _output_dataset_cfg(self):
 
-        update_name = "_".join([s for s in [self.model.name, self.exp_name] if s is not None])
+        update_name = "_".join([s for s in [self.model.name, self.eval_name] if s is not None])
         dataset_updates_path = osp.join(self.qualitatives_dir, f"{update_name}.pickle")
         dataset_layout_path = osp.join(self.qualitatives_dir, "layout.pickle")
         dataset_cfg_path = osp.join(self.qualitatives_dir, "dataset.cfg")
@@ -625,10 +729,9 @@ class MultiViewDepthEvaluation:
         dataset_layout = self._get_layout()
         dataset_layout.write(dataset_layout_path)
 
-        dataset_cls_name = get_full_class_name(self.dataset)
-        self.dataset.write_config(path=dataset_cfg_path, dataset_cls_name=dataset_cls_name,
-                                  updates=[dataset_updates_path], update_strict=True,
-                                  layouts=[dataset_layout_path])
+        self.dataset.write_config(path=dataset_cfg_path,
+                                  extra_updates=[dataset_updates_path], extra_layouts=[dataset_layout_path], update_strict=True,
+                                  augmentations=None, target_size=None, input_size=None, input_resize_backend=None)
 
     def _get_layout(self):
         layout = Layout(name="eval_mvd")

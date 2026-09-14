@@ -2,6 +2,8 @@ import os.path as osp
 import abc
 import pickle
 
+from rmvd.utils import logging
+
 
 class Update(metaclass=abc.ABCMeta):    
     def __init__(self):
@@ -13,31 +15,42 @@ class Update(metaclass=abc.ABCMeta):
 
 
 class Updates:
-    def __init__(self, name, root=None, prefix=None, postfix=None, verbose=True, **kwargs):
+    def __init__(self, name, updates=None, root=None, prefix=None, postfix=None, verbose=True):
         self.name = name
         self.verbose = verbose
+        self.path = None  # path of the file that the updates were created from; set in from_file
 
         if self.verbose:
-            print(f"Initializing dataset updates {self.name}.")
+            logging.info(f"Initializing dataset updates {self.name}.")
 
         self.root = root
         self.prefix = prefix
         self.postfix = postfix
 
-        self.updates = {}
-        self._init_updates(**kwargs)
+        self.updates = {} if updates is None else updates
 
         if self.verbose:
             if self.root is not None:
-                print(f"\tData root: {self.root}")
-            print(f"\tPrefix: {self.prefix}")
-            print(f"\tPostfix: {self.postfix}")
-            print(f"\tNumber of updates: {len(self)}")
-            print(f"Finished initializing dataset update {self.name}.")
+                logging.info(f"\tData root: {self.root}")
+            logging.info(f"\tPrefix: {self.prefix}")
+            logging.info(f"\tPostfix: {self.postfix}")
+            logging.info(f"\tNumber of updates: {len(self)}")
+            logging.info(f"Finished initializing dataset update {self.name}.")
 
-    @abc.abstractmethod
-    def _init_updates(self):
-        return
+    @classmethod
+    def from_file(cls, path, **kwargs):
+        name = osp.splitext(osp.split(path)[1])[0]
+
+        with open(path, "rb") as file:
+            updates = pickle.load(file)
+
+        update = cls(name=name, updates=updates, **kwargs)
+        update.path = path
+        return update
+
+    def write(self, path):
+        with open(path, "wb") as file:
+            pickle.dump(self.updates, file)
 
     def apply_update(self, sample_dict, index):
         if index in self:
@@ -63,20 +76,3 @@ class Updates:
 
     def __len__(self):
         return len(self.updates)
-
-    # TODO: remove _init_updates and a classmethod from_file; pass updates=None as paramter to __init__ ?, remove PickledUpdates?
-
-
-class PickledUpdates(Updates):
-
-    def __init__(self, path, **kwargs):
-        name = osp.splitext(osp.split(path)[1])[0]
-        super().__init__(name=name, path=path, **kwargs)
-
-    def _init_updates(self, path):
-        with open(path, "rb") as file:
-            self.updates = pickle.load(file)
-
-    def write(self, path):
-        with open(path, "wb") as file:
-            pickle.dump(self.updates, file)

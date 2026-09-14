@@ -2,7 +2,7 @@
 
 if [ -z "$1" ]
 then
-   echo "Please path a target path to this script, e.g.: /download_eth3d.sh /path/to/eth3d.";
+   echo "Please pass a target path to this script, e.g.: /download_eth3d.sh /path/to/eth3d.";
    exit 1
 fi
 

@@ -75,7 +75,6 @@ class Viewer(QWidget):
 
         self._index = index
         display_datas = self._model[self._index]
-        # TODO: get info_dict and print it to console
 
         for idx, display_data in enumerate(display_datas):
             display = self._grid.displays()[idx]

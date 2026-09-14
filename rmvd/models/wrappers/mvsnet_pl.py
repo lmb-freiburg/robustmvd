@@ -8,7 +8,8 @@ import numpy as np
 
 from ..registry import register_model
 from ..helpers import build_model_with_cfg
-from rmvd.utils import get_path, get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index
+from .utils import get_repo_path
+from rmvd.utils import get_torch_model_device, to_numpy, to_torch, select_by_index, exclude_index, logging
 from rmvd.data.transforms import ResizeInputs
 
 
@@ -17,14 +18,13 @@ class MVSNet_pl_Wrapped(nn.Module):
         super().__init__()
 
         import sys
-        paths_file = osp.join(osp.dirname(osp.realpath(__file__)), 'paths.toml')
-        repo_path = get_path(paths_file, "mvsnet_pl", "root")
+        repo_path = get_repo_path("mvsnet_pl")
         sys.path.insert(0, repo_path)
         from models.mvsnet import MVSNet
         self.model = MVSNet()
 
         weights_path = osp.join(repo_path, "_ckpt_epoch_14.ckpt")
-        print(f"Using model weights from {weights_path}.")
+        logging.info(f"Using model weights from {weights_path}.")
         weights = torch.load(weights_path)['state_dict']
         fixed_weights = {}
         for k, v in weights.items():

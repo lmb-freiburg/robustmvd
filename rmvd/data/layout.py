@@ -42,6 +42,7 @@ class Layout:
     def __init__(self, name, visualizations=None):
         self.name = name
         self.visualizations = [] if visualizations is None else visualizations
+        self.path = None  # path of the file that the layout was created from; set in from_file
 
     def load(self, data):
         display_datas = []
@@ -54,21 +55,24 @@ class Layout:
 
     def write(self, path):
         path = path + '.pickle' if not path.endswith('.pickle') else path
-        self.visualizations.append(self.name)  # TODO: refactor this
 
         with open(path, 'wb') as file:
-            pickle.dump(self.visualizations, file)
-
-        self.visualizations = self.visualizations[:-1]
+            pickle.dump({'name': self.name, 'visualizations': self.visualizations}, file)
 
     @classmethod
     def from_file(cls, path, name=None):
         path = path + '.pickle' if not path.endswith('.pickle') else path
 
         with open(path, 'rb') as file:
-            visualizations = pickle.load(file)
+            data = pickle.load(file)
 
-        name = name if name is not None else visualizations[-1]
-        visualizations = visualizations[:-1]
+        if isinstance(data, dict):
+            visualizations = data['visualizations']
+            name = name if name is not None else data['name']
+        else:  # legacy format: in a previous implementation, the layout name was appended to the list of visualizations
+            visualizations = data[:-1]
+            name = name if name is not None else data[-1]
 
-        return cls(name=name, visualizations=visualizations)
+        layout = cls(name=name, visualizations=visualizations)
+        layout.path = path
+        return layout

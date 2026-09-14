@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from rmvd.utils import to_torch
 
 def normalize(x, dim=None, eps=1e-9):
     norm = torch.linalg.norm(x, dim=dim, keepdim=True)
@@ -97,6 +98,41 @@ def warp(x, offset=None, grid=None, padding_mode='border'):  # based on PWC-Net 
         mask[mask > 0] = 1
 
     return output, mask  # N,C,h_out,w_out ; N,1,h_out,w_out
+
+
+class WarpOnlyCorr(nn.Module):
+    def __init__(self, normalize=False, padding_mode='zeros'):
+        super().__init__()
+        self.normalize = normalize
+        self.padding_mode = padding_mode
+
+        if isinstance(self.normalize, str):
+            assert self.normalize == 'dim' or self.normalize == 'before' or self.normalize == 'after'
+
+
+    def forward(self, feat_ref, feat_src, grids=None, mask=None):
+        """
+        Correlate features feat_ref and feat_src for points in feat_src located at the specified offsets.
+
+        :param feat_ref: Reference feature map. NCHrWr. Unused!
+        :param feat_src: Source feature map. NCHsWs.
+        :param offsets: Offsets of the S correlation points in the source feature map. NS2HrWr.
+        :param grids: Locations of the S correlation points in the source feature map. NS2HrWr.
+        :param mask: Mask that marks invalid offsets/grid locations, where the correlation score should be set to 0. NSHrWr.
+        :return: Warped source feature maps and warping mask. NSCHrWr and NSHrWr.
+        """
+
+        if self.normalize == 'before':
+            feat_src = normalize(feat_src, dim=1)
+
+        warped_feat_src, warping_mask = warp_multi(x=feat_src, grids=grids, padding_mode=self.padding_mode)  # NSCHW, NSHW
+
+        if self.normalize and self.normalize != 'before' and self.normalize != 'dim':
+            warped_feat_src = normalize(warped_feat_src, dim=2)  # increases memory a lot
+
+        warped_feat_src = warped_feat_src * warping_mask.unsqueeze(2)
+
+        return warped_feat_src, warping_mask
 
 
 class TorchCorr(nn.Module):  # based on RAFT
@@ -327,7 +363,7 @@ class EpipolarSamplingPoints:
 
 class PlanesweepCorrelation(nn.Module):
     @torch.no_grad()
-    def __init__(self):
+    def __init__(self, warp_only=False, normalize='dim'):
 
         super().__init__()
 
@@ -339,12 +375,10 @@ class PlanesweepCorrelation(nn.Module):
         self.source_to_key_transforms = None
         self.device = None
 
-        d_min = 1 / 1000
-        d_max = 1 / 0.4
-        self.steps = 256
-        self.ds = d_min + np.arange(0, self.steps) * (d_max - d_min) / (self.steps - 1)
-
-        self.corr_block = TorchCorr(normalize='dim', padding_mode='zeros')
+        if not warp_only:
+            self.corr_block = TorchCorr(normalize=normalize, padding_mode='zeros')
+        else:
+            self.corr_block = WarpOnlyCorr(normalize=normalize, padding_mode='zeros')
 
         self.coeffs = []
 
@@ -353,7 +387,8 @@ class PlanesweepCorrelation(nn.Module):
         self.corrs = []
         self.masks = []
 
-    def forward(self, feat_key, intrinsics_key, feat_sources, source_to_key_transforms, intrinsics_sources=None):
+    def forward(self, feat_key, intrinsics_key, feat_sources, source_to_key_transforms, intrinsics_sources=None, 
+                num_sampling_points=None, min_depth=None, max_depth=None, sampling_invdepths=None, sampling_type='linear_invdepth'):
 
         self.feat_key = feat_key
         self.feat_key_width, self.feat_key_height = feat_key.shape[3], feat_key.shape[2]
@@ -365,12 +400,13 @@ class PlanesweepCorrelation(nn.Module):
 
         self.reset()
         self.init_coeffs()
-
-        self.get_plane_sweep_sampling_points()
+        
+        sampling_invdepths = self.get_sampling_invdepths(num_sampling_points, min_depth, max_depth, sampling_invdepths, sampling_type)
+        self.get_plane_sweep_sampling_points(sampling_invdepths=sampling_invdepths)
 
         self.correlate()
 
-        return self.corrs, self.masks
+        return self.corrs, self.masks, sampling_invdepths
 
     def reset(self):
 
@@ -404,16 +440,29 @@ class PlanesweepCorrelation(nn.Module):
                                                device=device)
             
             self.coeffs.append(coeffs)
+        
+    @torch.no_grad()
+    def get_sampling_invdepths(self, num_sampling_points=None, min_depth=None, max_depth=None, sampling_invdepths=None, sampling_type='linear_invdepth'):
+        if min_depth is not None and max_depth is not None:
+            assert sampling_invdepths is None
+            assert num_sampling_points is not None
+            assert sampling_type is not None
+            sampling_invdepths = compute_sampling_invdepths(min_depth, max_depth, num_sampling_points, sampling_type)
+        else:
+            assert num_sampling_points is None and min_depth is None and max_depth is None
+            assert sampling_invdepths is not None
+            
+        sampling_invdepths = sampling_invdepths.to(self.device)
+        assert sampling_invdepths.ndim >= 2  # (N, S) or (N, S, H) or (N, S, H, W)
+        while sampling_invdepths.ndim < 4:
+            sampling_invdepths = sampling_invdepths.unsqueeze(-1)
+            
+        return sampling_invdepths
 
     @torch.no_grad()
-    def get_plane_sweep_sampling_points(self):
+    def get_plane_sweep_sampling_points(self, sampling_invdepths):
 
-        device = self.device
-
-        ds = torch.from_numpy(self.ds).float()
-        ds = ds.reshape(1, -1, 1, 1)  # (1, S, H, W)
-        ds = ds.to(device)
-
+        ds = sampling_invdepths
         zs = 1./ds
 
         for coeffs in self.coeffs:
@@ -442,3 +491,31 @@ class PlanesweepCorrelation(nn.Module):
 
             self.corrs.append(corr)
             self.masks.append(mask)
+            
+            
+def compute_sampling_invdepths(min_depth, max_depth, num_samples, sampling_type='linear_invdepth'):
+    """Compute the inverse depth values for the sampling points.
+    
+    Args:
+        min_depth: Minimum depth value. Can be: float, torch.Tensor of shape [N], numpy.ndarray of shape (N,).
+        max_depth: Maximum depth value. Can be: float, torch.Tensor of shape [N], numpy.ndarray of shape (N,).
+        num_samples (int): Number of sampling points.
+    """
+    if isinstance(min_depth, np.float32) or isinstance(min_depth, float):
+        min_depth = torch.tensor([min_depth])
+    if isinstance(max_depth, np.float32) or isinstance(max_depth, float):
+        max_depth = torch.tensor([max_depth])
+        
+    min_depth = to_torch(min_depth)[..., None]  # shape [1, 1] or [N, 1]
+    max_depth = to_torch(max_depth)[..., None]  # shape [1, 1] or [N, 1]
+    min_invdepth = (1 / max_depth)
+    max_invdepth = (1 / min_depth)
+    steps = torch.arange(0, num_samples, dtype=min_invdepth.dtype, device=min_invdepth.device)[None, ...]  # shape [1, num_samples]
+    
+    if sampling_type == 'linear_invdepth':
+        sampling_invdepths = min_invdepth + steps * (max_invdepth - min_invdepth) / (num_samples - 1)  # shape [1, num_samples] or [N, num_samples]
+    elif sampling_type == 'linear_depth':
+        sampling_invdepths = 1 / (min_depth + steps * (max_depth - min_depth) / (num_samples - 1))  # shape [1, num_samples] or [N, num_samples]
+        sampling_invdepths = sampling_invdepths.flip(1)
+        
+    return sampling_invdepths  # shape [1, num_samples] or [N, num_samples]

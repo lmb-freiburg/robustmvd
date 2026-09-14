@@ -59,31 +59,49 @@ class RobustMVD(nn.Module):
 
         ctx = self.context_encoder(enc_key)
 
-        corrs, masks = self.corr_block(feat_key=enc_key, intrinsics_key=intrinsics_key, feat_sources=enc_sources,
-                                       source_to_key_transforms=source_to_key_transforms,
-                                       intrinsics_sources=intrinsics_source)
+        corrs, masks, _ = self.corr_block(feat_key=enc_key, intrinsics_key=intrinsics_key, feat_sources=enc_sources, 
+                                          source_to_key_transforms=source_to_key_transforms,
+                                          intrinsics_sources=intrinsics_source, 
+                                          num_sampling_points=256, min_depth=0.4, max_depth=1000.)
 
-        fused_corr, fused_mask = self.fusion_block(corrs=corrs, masks=masks)
+        fused_corr, _ = self.fusion_block(corrs=corrs, masks=masks)
 
         all_enc_fused, enc_fused = self.fusion_enc_block(corr=fused_corr, ctx=ctx)
 
         dec = self.decoder(enc_fused=enc_fused, all_enc={**all_enc_key, **all_enc_fused})
+
+        if not self.training:
+            # The RMVD model was trained with a bug in the MultiScaleUniLaplace loss which causes network
+            # learn a Laplace distribution scale parameter b that would fit to a scaled inverse depth space,
+            # which was scaled by a factor of 1050. 
+            # To get the Laplace scale b at true inverse depth scale, we need to divide the predicted b by 1050.
+            # Equivalently, log(1050) is subtracted from the predicted log_b.
+            # If one would retrain the model with apply_fix=True in MultiScaleUniLaplace, this if-block here
+            # could be removed, as the model would learn to predict the Laplace scale b at true inverse depth scale directly.
+            mean_scaling_factor = 1050
+            log_mean_scaling_factor = math.log(mean_scaling_factor)
+            dec['invdepth_log_b'] = dec['invdepth_log_b'] - log_mean_scaling_factor
+            dec['invdepth_log_bs_all'] = [log_b - log_mean_scaling_factor for log_b in dec['invdepth_log_bs_all']]
+            dec['invdepth_uncertainty'] = torch.log(2 * torch.exp(dec['invdepth_log_b']) + 1e-4) + 1
+            dec['invdepth_uncertainties_all'] = [torch.log(2 * torch.exp(log_b) + 1e-4) + 1 for log_b in dec['invdepth_log_bs_all']]
 
         pred = {
             'depth': 1 / (dec['invdepth'] + 1e-9),
             'depth_uncertainty': torch.exp(dec['invdepth_log_b']) / (dec['invdepth'] + 1e-9)
         }
         aux = dec
+        aux['depth'] = pred['depth']
+        aux['depth_uncertainty'] = pred['depth_uncertainty']
 
         return pred, aux
 
-    def input_adapter(self, images, keyview_idx, poses=None, intrinsics=None, depth_range=None):
+    def input_adapter(self, images, keyview_idx, poses, intrinsics, **_):
         device = get_torch_model_device(self)
 
         orig_ht, orig_wd = images[0].shape[-2:]
         ht, wd = int(math.ceil(orig_ht / 64.0) * 64.0), int(math.ceil(orig_wd / 64.0) * 64.0)
         if (orig_ht != ht) or (orig_wd != wd):
-            resized = ResizeInputs(size=(ht, wd))({'images': images, 'intrinsics': intrinsics})
+            resized = ResizeInputs(size=(ht, wd), backend="cv2_bilinear")({'images': images, 'intrinsics': intrinsics})
             images = resized['images']
             intrinsics = resized['intrinsics']
 
@@ -94,15 +112,14 @@ class RobustMVD(nn.Module):
         scale_arr = np.array([[wd]*3, [ht]*3, [1.]*3], dtype=np.float32)  # 3, 3
         intrinsics = [intrinsic / scale_arr for intrinsic in intrinsics]
 
-        images, keyview_idx, poses, intrinsics, depth_range = \
-            to_torch((images, keyview_idx, poses, intrinsics, depth_range), device=device)
+        images, keyview_idx, poses, intrinsics = \
+            to_torch((images, keyview_idx, poses, intrinsics), device=device)
 
         sample = {
             'images': images,
             'keyview_idx': keyview_idx,
             'poses': poses,
             'intrinsics': intrinsics,
-            'depth_range': depth_range,
         }
         return sample
 
@@ -111,17 +128,21 @@ class RobustMVD(nn.Module):
         return to_numpy(pred), to_numpy(aux)
 
 
-@register_model(trainable=False)
-def robust_mvd_5M(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
-    pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd.pt'
-    weights = pretrained_weights if (pretrained and weights is None) else None
+@register_model
+def robust_mvd(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+    pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd_600k.pt'
+    weights = pretrained_weights if (pretrained and weights is None) else weights
     model = build_model_with_cfg(model_cls=RobustMVD, weights=weights, train=train, num_gpus=num_gpus)
     return model
 
 
-@register_model
-def robust_mvd(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
-    pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd_600k.pt'
-    weights = pretrained_weights if (pretrained and weights is None) else None
-    model = build_model_with_cfg(model_cls=RobustMVD, weights=weights, train=train, num_gpus=num_gpus)
+@register_model(trainable=False)
+def robust_mvd_5M(pretrained=True, weights=None, train=False, num_gpus=1, **kwargs):
+
+    assert pretrained and (
+        weights is None
+    ), "Model supports only pretrained=True, weights=None."
+
+    pretrained_weights = 'https://lmb.informatik.uni-freiburg.de/people/schroepp/weights/robustmvd.pt'
+    model = build_model_with_cfg(model_cls=RobustMVD, weights=pretrained_weights, train=train, num_gpus=num_gpus)
     return model

@@ -1,15 +1,13 @@
 import os
 import os.path as osp
-from typing import Optional, Sequence
+from typing import List, Optional
 import time
 
 import torch
 
 from rmvd import create_batch_augmentation
 from rmvd.utils import TrainStateSaver, WeightsOnlySaver, to_torch, get_torch_model_device, \
-    count_torch_model_parameters, writer, select_by_index, exclude_index
-
-# TODO: add proper logger that writes to file + optionally outputs timestamps
+    count_torch_model_parameters, writer, select_by_index, exclude_index, logging
 
 
 class MultiViewDepthTraining:
@@ -18,7 +16,7 @@ class MultiViewDepthTraining:
     Can be applied to a dataset and model to train the model on the dataset.
 
     Args:
-        out_dir: Directory where results will be written. If None, results are not written to disk.
+        out_dir: Directory where outputs will be written.
         model: Model to train.
         dataset: Dataset for training.
         optimizer: Optimizer for training.
@@ -57,29 +55,27 @@ class MultiViewDepthTraining:
                  loss: torch.nn.Module,
                  batch_size: int,
                  max_iterations: int,
-                 inputs: Sequence[str] = None,
-                 batch_augmentations: Optional[Sequence[str]] = None,
+                 inputs: Optional[List[str]] = None,
+                 batch_augmentations: Optional[List[str]] = None,
                  alignment: Optional[str] = None,
                  grad_clip_max_norm: Optional[float] = None,
-                 num_workers: Optional[int] = 8,
-                 print_interval: Optional[int] = 100,
-                 log_loss_interval: Optional[int] = 100,
-                 log_interval: Optional[int] = 5000,
-                 save_checkpoint_interval_min: Optional[int] = 20,
-                 log_full_batch: Optional[bool] = False,
+                 num_workers: int = 8,
+                 print_interval: int = 100,
+                 log_loss_interval: int = 100,
+                 log_interval: int = 5000,
+                 save_checkpoint_interval_min: int = 20,
+                 log_full_batch: bool = False,
                  verbose: bool = True,
                  **_, ):
 
 
-        # TODO: set up logging
-
         self.verbose = verbose
-
-        if self.verbose:
-            print(f"Initializing training {self.name}.")
 
         self.out_dir = out_dir
         self._init_dirs()
+
+        if self.verbose:
+            logging.info(f"Initializing training {self.name}.")
 
         # will be set/used in __call__:
 
@@ -120,9 +116,13 @@ class MultiViewDepthTraining:
         self.save_checkpoint_interval_min = save_checkpoint_interval_min
 
         if self.verbose:
-            print(self)
-            print(f"Finished initializing training {self.name}.")
-            print()
+            logging.info(self)
+            logging.info(f"Finished initializing training {self.name}.")
+            logging.info()
+            
+    def __del__(self):
+        if self.log_file_path is not None:
+            logging.remove_log_file(self.log_file_path)
 
     @property
     def name(self):
@@ -133,6 +133,7 @@ class MultiViewDepthTraining:
         ret += f"\n\tOutput directory: {self.out_dir}"
         ret += f"\n\tModel: {self.model.name}"
         ret += f"\n\tModel parameter count: {count_torch_model_parameters(self.model)}"
+        ret += f"\n\tTrainable model parameter count: {count_torch_model_parameters(self.model, requires_grad_only=True)}"
         ret += f"\n\tDataset: {self.dataset.name}"
         ret += f"\n\tDataset size: {len(self.dataset)}"
         ret += f"\n\tOptimizer: {self.optimizer.name}"
@@ -143,7 +144,7 @@ class MultiViewDepthTraining:
         ret += f"\n\tInputs: {self.inputs}"
         ret += f"\n\tAlignment: {self.alignment}"
         ret += f"\n\tFinished iterations: {self.finished_iterations}"
-        ret += f"\n\tMax iterations: {self.max_iterations}"  # TODO: add num epochs = max_iterations / len(dataset)
+        ret += f"\n\tMax iterations: {self.max_iterations}"
         return ret
 
     def _init_dirs(self):
@@ -159,7 +160,7 @@ class MultiViewDepthTraining:
         os.makedirs(self.checkpoints_dir, exist_ok=True)
         os.makedirs(self.weights_only_checkpoints_dir, exist_ok=True)
 
-        # TODO: log.add_log_file(self.log_file_path, flush_line=True)
+        logging.add_log_file(self.log_file_path, flush_line=True)
 
     def _init_batch_augmentations(self, batch_augmentations):
         for batch_augmentation in batch_augmentations:
@@ -173,11 +174,11 @@ class MultiViewDepthTraining:
         should_continue = lambda: self.finished_iterations < self.max_iterations
 
         if not should_continue():
-            print("Training already finished.")
+            logging.info("Training already finished.")
             return
 
         if self.verbose:
-            print(f"Starting training {self.name}.")
+            logging.info(f"Starting training {self.name}.")
 
         self.model.train()
 
@@ -199,7 +200,8 @@ class MultiViewDepthTraining:
                     sample = to_torch(sample, device=get_torch_model_device(self.model))
                     sample_inputs, sample_gt = self._inputs_and_gt_from_sample(sample)
 
-                    pred, aux = self.model(**sample_inputs)
+                    with writer.TimeWriter(name="00_overview/forward_pass_sec", step=self.finished_iterations, write=should_log_loss(), avg_over_steps=False):
+                        pred, aux = self.model(**sample_inputs)
 
                     loss, sub_losses, pointwise_losses = self.loss(sample_inputs=sample_inputs, sample_gt=sample_gt,
                                                                    pred=pred, aux=aux, iteration=self.finished_iterations)
@@ -214,8 +216,8 @@ class MultiViewDepthTraining:
                 if should_print():
                     end_print_interval = time.time()
                     time_per_iteration = (end_print_interval - start_print_interval) / steps_since_print
-                    print(f"Iteration {self.finished_iterations}/{self.max_iterations} - "
-                          f"{time_per_iteration:1.4f} sec per iteration - loss: {loss:1.5f}")
+                    logging.info(f"Iteration {self.finished_iterations}/{self.max_iterations} - "
+                                 f"{time_per_iteration:1.4f} sec per iteration - loss: {loss:1.5f}")
                     start_print_interval = time.time()
                     steps_since_print = 0
 
@@ -239,12 +241,13 @@ class MultiViewDepthTraining:
         self._write_checkpoints()
 
         if self.verbose:
-            print(f"Finished training {self.name}.")
+            logging.info(f"Finished training {self.name}.")
 
     def _inputs_and_gt_from_sample(self, sample):
         is_input = lambda key: key in self.inputs or key == "keyview_idx"
+        is_gt = lambda key: key not in self.inputs or key == "keyview_idx"
         sample_inputs = {key: val for key, val in sample.items() if is_input(key)}
-        sample_gt = {key: val for key, val in sample.items() if not is_input(key)}
+        sample_gt = {key: val for key, val in sample.items() if is_gt(key)}
         return sample_inputs, sample_gt
 
     def _setup_savers(self):
@@ -265,20 +268,20 @@ class MultiViewDepthTraining:
         return sorted(checkpoints)
 
     def _restore_weights(self):
-        all_checkpoints = self._get_all_checkpoints()
+        all_checkpoints = sorted(self.saver_all.get_checkpoints(include_iteration=True))
         if len(all_checkpoints) > 0:
             
-            print("Existing checkpoints:")
+            logging.info("Existing checkpoints:")
             for step, checkpoint in all_checkpoints:
-                print(f"\t{step}: {checkpoint}")
+                logging.info(f"\t{step}: {checkpoint}")
                 
             newest_checkpoint = all_checkpoints[-1][1]
             if self.saver_all.has_checkpoint(newest_checkpoint):
-                print(f"Restoring training state from checkpoint {newest_checkpoint}.")
+                logging.info(f"Restoring training state from checkpoint {newest_checkpoint}.")
                 self.saver_all.load(full_path=newest_checkpoint)
                 
             elif self.saver_weights_only.has_checkpoint(newest_checkpoint):
-                print(f"Restoring weights-only from checkpoint {newest_checkpoint}.")
+                logging.info(f"Restoring weights-only from checkpoint {newest_checkpoint}.")
                 self.saver_weights_only.load(full_path=newest_checkpoint, strict=True)
                 
             else:
@@ -295,11 +298,11 @@ class MultiViewDepthTraining:
 
     def _save_all(self):
         save_path = self.saver_all.save(iteration=self.finished_iterations)
-        print(f"Saved training state checkpoint to {save_path}.")
+        logging.info(f"Saved training state checkpoint to {save_path}.")
 
     def _save_weights_only(self):
         save_path = self.saver_weights_only.save(iteration=self.finished_iterations)
-        print(f"Saved weights-only checkpoint to {save_path}.")
+        logging.info(f"Saved weights-only checkpoint to {save_path}.")
 
     def _log_all(self, sample_inputs, sample_gt, pred, aux, loss, sub_losses, pointwise_losses):
         self._log_in_data(sample_inputs, sample_gt)
@@ -338,7 +341,7 @@ class MultiViewDepthTraining:
             writer.put_tensor(name=f"{base_name}/01_pred_depth_uncertainty", tensor=pred_depth_uncertainty,
                               step=self.finished_iterations, full_batch=self.log_full_batch)
 
-        writer.put_tensor_dict(name=f"{base_name}/02_aux", tensor=aux, step=self.finished_iterations,
+        writer.put_tensor_dict(name=f"{base_name}/02_aux", tensor=aux, step=self.finished_iterations, filter=True,
                                full_batch=self.log_full_batch)
 
     def _log_loss(self, loss, sub_losses, pointwise_losses, scalars_only=True):

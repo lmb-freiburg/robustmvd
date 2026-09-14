@@ -66,10 +66,10 @@ class KITTIRobustMVD(Dataset):
 
     base_dataset = 'kitti'
     split = 'robustmvd'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("kitti", "root")
+        root = root if root is not None else self._get_root_from_paths_file("kitti")
 
         default_layouts = [
             MVDSequentialDefaultLayout("default", num_views=21, keyview_idx=10),
@@ -85,10 +85,29 @@ class KITTIEigenDenseDepthTest(Dataset):
 
     base_dataset = 'kitti'
     split = 'eigen_dense_depth_test'
-    dataset_type = 'mvd'
+    data_format = 'mvd'
 
     def __init__(self, root=None, layouts=None, **kwargs):
-        root = root if root is not None else self._get_path("kitti", "root")
+        root = root if root is not None else self._get_root_from_paths_file("kitti")
+
+        default_layouts = [
+            MVDSequentialDefaultLayout("default", num_views=1, keyview_idx=0),
+            AllImagesLayout("all_images", num_views=1),
+        ]
+        layouts = default_layouts + layouts if layouts is not None else default_layouts
+
+        super().__init__(root=root, layouts=layouts, **kwargs)
+                
+
+@register_dataset   
+class KITTIEigenDenseDepthTrain(Dataset):
+
+    base_dataset = 'kitti'
+    split = 'eigen_dense_depth_train'
+    data_format = 'mvd'
+
+    def __init__(self, root=None, layouts=None, **kwargs):
+        root = root if root is not None else self._get_root_from_paths_file("kitti")
 
         default_layouts = [
             MVDSequentialDefaultLayout("default", num_views=1, keyview_idx=0),

@@ -1,5 +1,6 @@
 import importlib
 import collections
+import os.path as osp
 import re
 import random
 
@@ -38,7 +39,7 @@ def compute_depth_range(depth=None, invdepth=None, default_min_depth=0.1, defaul
             depth_range = (1./max_invdepth, 1./min_invdepth)
             return depth_range
         
-    return (default_min_depth, default_max_depth)
+    return (np.float32(default_min_depth), np.float32(default_max_depth))
 
 
 def get_function(name):  # from https://github.com/aschampion/diluvian/blob/master/diluvian/util.py
@@ -79,26 +80,134 @@ def get_full_class_name(obj):
         return module + '.' + obj.__class__.__name__
 
 
-def trans_from_transform(T):
-    return T[0:3, 3]
+def trans_from_transform(T):  # can handle np arrays and torch tensors
+    if T.ndim == 2:
+        t = T[0:3, 3]
+    elif T.ndim == 3:
+        t = T[:, 0:3, 3]
+    else:
+        raise ValueError("Transform must have 2 or 3 dimensions, but has {} dimensions.".format(T.ndim))
+
+    return t
 
 
-def rot_from_transform(T):
-    return T[0:3, 0:3]
+def rot_from_transform(T):  # can handle np arrays and torch tensors
+    if T.ndim == 2:
+        R = T[0:3, 0:3]
+    elif T.ndim == 3:
+        R = T[:, 0:3, 0:3]
+    else:
+        raise ValueError("Transform must have 2 or 3 dimensions, but has {} dimensions.".format(T.ndim))
+
+    return R
 
 
-def transform_from_rot_trans(R, t):
-    R = R.reshape(3, 3)
-    t = t.reshape(3, 1)
-    return np.vstack((np.hstack([R, t]), [0, 0, 0, 1])).astype(np.float32)
+def _transform_from_rot_trans_np(R, t):
+    if R.ndim == 2:
+        assert t.ndim == 1, "If rotation has no batch dimension, translation must have 1 dimension, but has {} dimensions.".format(t.ndim)
+        t = t[..., np.newaxis]
+        last_row = np.array([0, 0, 0, 1], dtype=R.dtype)
+        T = np.vstack((np.hstack([R, t]), last_row))  # [4, 4]
+
+    elif R.ndim == 3:
+        N = R.shape[0]
+        assert t.ndim == 2, "If rotation has a batch dimension, translation must have 2 dimensions, but has {} dimensions.".format(t.ndim)
+        assert t.shape[0] == N, "Batch dimension of rotation and translation must match, but have {} and {}.".format(R.shape[0], t.shape[0])
+        t = t[..., np.newaxis]  # [N, 3, 1]
+        T = np.concatenate((R, t), -1)  # [N, 3, 4]
+        last_row = np.array([0, 0, 0, 1], dtype=T.dtype)
+        last_row = np.tile(last_row[np.newaxis, np.newaxis, :], (N, 1, 1))  # [N, 1, 4]
+        T = np.concatenate((T, last_row), 1)  # [N, 4, 4]
+
+    else:
+        raise ValueError("Rotation must have 2 or 3 dimensions, but has {} dimensions.".format(R.ndim))
+
+    return T
 
 
-def invert_transform(T):
-    R = T[0:3, 0:3]
-    t = T[0:3, 3]
-    R_inv = R.T
-    t_inv = np.dot(-R.T, t)
+def _transform_from_rot_trans_torch(R, t):
+    if R.ndim == 2:
+        assert t.ndim == 1, "If rotation has no batch dimension, translation must have 1 dimension, but has {} dimensions.".format(t.ndim)
+        t = t.unsqueeze(-1)  # [3, 1]
+        T = torch.vstack((torch.hstack([R, t]), torch.tensor([0, 0, 0, 1], dtype=R.dtype, device=R.device)))  # [4, 4]
+
+    elif R.ndim == 3:
+        N = R.shape[0]
+        assert t.ndim == 2, "If rotation has a batch dimension, translation must have 2 dimensions, but has {} dimensions.".format(t.ndim)
+        assert t.shape[0] == N, "Batch dimension of rotation and translation must match, but have {} and {}.".format(R.shape[0], t.shape[0])
+        t = t.unsqueeze(-1)  # [N, 3, 1]
+        T = torch.cat((R, t), -1)  # [N, 3, 4]
+        last_row = torch.tensor([0, 0, 0, 1], dtype=T.dtype, device=T.device)
+        last_row = last_row.unsqueeze(0).unsqueeze(0).expand(N, 1, 4)  # [N, 1, 4]
+        T = torch.cat((T, last_row), 1)  # [N, 4, 4]
+
+    else:
+        raise ValueError("Rotation must have 2 or 3 dimensions, but has {} dimensions.".format(R.ndim))
+
+    return T
+
+
+def transform_from_rot_trans(R, t):  # can handle np arrays and torch tensors
+    if isinstance(R, np.ndarray):
+        return _transform_from_rot_trans_np(R, t)
+    elif isinstance(R, torch.Tensor):
+        return _transform_from_rot_trans_torch(R, t)
+    else:
+        raise ValueError("Rotation/Translation must be numpy arrays or torch tensors.")
+
+
+def _invert_transform_np(T):
+    R = rot_from_transform(T)  # [3, 3] or [N, 3, 3]
+    t = trans_from_transform(T)  # [3] or [N, 3]
+    t = t[..., np.newaxis]  # [3, 1] or [N, 3, 1]
+    R_inv = np.swapaxes(R, -1, -2)  # [3, 3] or [N, 3, 3]
+    t_inv = np.matmul(-R_inv, t)[..., 0]  # [3] or [N, 3]
     return transform_from_rot_trans(R_inv, t_inv)
+
+
+def _invert_transform_torch(T):
+    R = rot_from_transform(T)  # [3, 3] or [N, 3, 3]
+    t = trans_from_transform(T)  # [3] or [N, 3]
+    t = t.unsqueeze(-1)  # [3, 1] or [N, 3, 1]
+    R_inv = torch.transpose(R, -1, -2)  # [3, 3] or [N, 3, 3]
+    t_inv = torch.matmul(-R_inv, t).squeeze(-1)  # [3] or [N, 3]
+    return transform_from_rot_trans(R_inv, t_inv)
+
+
+def invert_transform(T):  # can handle np arrays and torch tensors
+    if isinstance(T, np.ndarray):
+        return _invert_transform_np(T)
+    elif isinstance(T, torch.Tensor):
+        return _invert_transform_torch(T)
+    else:
+        raise ValueError("Transform must be a numpy array or a torch tensor.")
+
+
+def rotx(t):                                                                    
+    """Rotation about the x-axis."""
+    c = np.cos(t)
+    s = np.sin(t)
+    return np.array([[1, 0, 0], 
+                     [0, c, -s],
+                     [0, s, c]])                                                                                                                                                              
+
+
+def roty(t):
+    """Rotation about the y-axis."""
+    c = np.cos(t)
+    s = np.sin(t)
+    return np.array([[c, 0, s],
+                     [0, 1, 0],
+                     [-s, 0, c]])
+
+
+def rotz(t):
+    """Rotation about the z-axis."""
+    c = np.cos(t)
+    s = np.sin(t)
+    return np.array([[c, -s, 0],
+                     [s, c, 0],
+                     [0, 0, 1]])
 
 
 def to_cuda(data, device=None):
@@ -269,8 +378,9 @@ def check_torch_model_cuda(model):
     return is_cuda
 
 
-def count_torch_model_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+def count_torch_model_parameters(model, requires_grad_only=False):
+    params = model.parameters()  # shared/tied parameters are deduplicated by parameters()
+    return sum(p.numel() for p in params if p.requires_grad or not requires_grad_only)
 
 
 def select_by_index(l, idx):
@@ -313,11 +423,71 @@ def exclude_index(l, exclude_idx):
         for batch_idx, exclude_idx in enumerate(exclude_indices):
             ret.append([ele[batch_idx] for idx, ele in enumerate(l) if idx != exclude_idx])
 
-        transposed = list(zip(*ret))
-        if isinstance(transposed[0][0], np.ndarray):
-            ret = [np.stack(ele, 0) for ele in transposed]
-        else:
-            ret = [torch.stack(ele, 0) for ele in transposed]
+        if len(l) == 1 and len(ret) > 0 and all(len(ele) == 0 for ele in ret):
+            return []
+
+        if len(ret) > 0 and all([len(ele) > 0 for ele in ret]):
+            transposed = list(zip(*ret))
+            if isinstance(transposed[0][0], np.ndarray):
+                ret = [np.stack(ele, 0) for ele in transposed]
+            else:
+                ret = [torch.stack(ele, 0) for ele in transposed]
+
+    return ret
+
+
+def insert_at_index(l, idx, ele):
+    """Insert an element into a list at an index. Supports data batches with different indices.
+
+    Args:
+        l (list): List with potentially batched data items. In case idx is batched, each element in l must be batched with the same first dimension as idx.
+        idx: idx can be an integer in case of non-batched data or in case all samples in the batch should be inserted at the same index.
+            Alternatively, idx can be an iterable that contains indices for each sample in the batch separately.
+        ele: The element to insert. In case idx is batched, ele must be batched with the same first dimension as idx.
+    Returns:
+        list: New list with length len(l) + 1.
+    """
+    def _to_int(x):
+        # robustly convert numpy/torch scalars to Python int
+        if isinstance(x, int):
+            return x
+        if hasattr(x, "item"):
+            try:
+                return int(x.item())
+            except Exception:
+                pass
+        return int(x)
+
+    n = len(l)
+
+    if isinstance(idx, int):
+        pos = idx
+        if pos < 0:
+            pos = 0
+        if pos > n:
+            pos = n
+        ret = l[:pos] + [ele] + l[pos:]
+
+    else:
+        indices = [_to_int(i) for i in idx]
+        indices = [0 if i < 0 else (n if i > n else i) for i in indices]
+
+        ret = []
+        for out_pos in range(n + 1):
+            pieces = []
+            for batch_idx, ins_pos in enumerate(indices):
+                if ins_pos == out_pos:
+                    pieces.append(ele[batch_idx])
+                else:
+                    src = out_pos if out_pos < ins_pos else out_pos - 1
+                    pieces.append(l[src][batch_idx])
+
+            if isinstance(pieces[0], np.ndarray):
+                stacked = np.stack(pieces, 0)
+            else:
+                stacked = torch.stack(pieces, 0)
+
+            ret.append(stacked)
 
     return ret
 
@@ -344,23 +514,38 @@ def batched_index(l, eles):
     return ret
 
 
+def get_paths_file(local_paths_file, home_paths_file, readme):
+    """Get the paths.toml file, either from the local (prioritized) or the home location."""
+    if osp.exists(local_paths_file):
+        paths_file = local_paths_file
+    elif osp.exists(home_paths_file):
+        paths_file = home_paths_file
+    else:
+        raise FileNotFoundError(f"No paths.toml file found at {local_paths_file} or {home_paths_file}. Please create "
+                                f"a paths.toml file as specified in the {readme} file.")
+
+    return paths_file
+
+
 def get_paths(paths_file):
     with open(paths_file, 'r') as paths_file:
         return pytoml.load(paths_file)
 
 
 def get_path(paths_file, *keys):
-    paths = get_paths(paths_file)
-    path = None
+    current = get_paths(paths_file)
 
-    for idx, key in enumerate(keys):
-        if key in paths:
-            if key in paths and (isinstance(paths[key], str) or isinstance(paths[key], list)) and idx == len(keys) - 1:
-                path = paths[key]
-            else:
-                paths = paths[key]
+    for key in keys:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
 
-    return path
+    if not isinstance(current, (str, list)):
+        return None
+
+    if isinstance(current, list):
+        return [osp.expanduser(p) for p in current]
+    return osp.expanduser(current)
 
 
 def normalize(x, dim=None, eps=1e-9):

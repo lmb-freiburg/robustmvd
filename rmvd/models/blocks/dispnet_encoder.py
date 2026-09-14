@@ -17,7 +17,7 @@ class DispnetEncoder(nn.Module):
 
         C_last = C_curr  # 128
         C_curr *= 2  # 256
-        self.conv3 = conv(C_last, C_curr, kernel_size=3, stride=2)  # TODO: rename to conv3a
+        self.conv3 = conv(C_last, C_curr, kernel_size=3, stride=2)
 
     def forward(self, image):
         conv1 = self.conv1(image)
